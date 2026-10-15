@@ -1,6 +1,6 @@
 import { ACTION } from '../actions.mjs';
 import { chip, escape, plural, tab } from '../dom.mjs';
-import { pretty } from './manifest-diff.mjs';
+import { jsonTree } from './json-tree.mjs';
 import { describe, isAi, markerOf, newestFirst, sourceTypeOf } from './timeline.mjs';
 
 const CHECK = '<path d="M5 12l5 5 9-10"></path>';
@@ -169,7 +169,21 @@ export function summary(provenance, { fresh, imageByTitle }) {
     ].join('');
 }
 
-export const raw = (provenance) => `<pre class="raw">${escape(pretty(provenance?.store))}</pre>`;
+const NO_MANIFEST = '<p class="muted">No manifest to show.</p>';
+
+export const raw = (provenance) =>
+    provenance
+        ? `
+    <div class="raw">
+        <div class="raw__bar">
+            <input class="field__input raw__search" type="search" placeholder="Search keys and values" aria-label="Search manifest" data-raw-search />
+            <button class="is-compact" type="button" data-raw-expand>Expand all</button>
+            <button class="is-compact" type="button" data-raw-collapse>Collapse all</button>
+            <button class="is-compact" type="button" data-raw-copy>Copy JSON</button>
+        </div>
+        <div class="raw__tree" data-raw-tree>${jsonTree(provenance.store)}</div>
+    </div>`
+        : NO_MANIFEST;
 
 const viewTab = (id, label, active) => tab(label, id === active, 'tab', id);
 
@@ -179,7 +193,7 @@ export const pane = ({ body, canCompare, tab: active }) => `
     <div class="credentials__head is-tabbed">
         ${HEADING}
         <div class="tabs" role="tablist" aria-label="Credentials view">
-            ${viewTab('summary', 'Summary', active)}${viewTab('raw', 'Raw manifest', active)}
+            ${viewTab('summary', 'Summary', active)}${viewTab('provenance', 'Provenance', active)}${viewTab('raw', 'Raw manifest', active)}
         </div>
     </div>
     <div class="credentials__body" role="tabpanel">${body}</div>

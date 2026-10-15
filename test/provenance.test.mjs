@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { loadConfig } from '../config/index.mjs';
 import { loadReaderContext } from '../lib/c2pa/context.mjs';
 import { AiEdit, ManualEdit } from '../lib/c2pa/manifest.mjs';
+import { Provenance } from '../lib/c2pa/provenance.mjs';
 import { loadLocalSigner } from '../lib/c2pa/signer.mjs';
 import { ActionKind, AI_ACTIONS, MANUAL_ACTIONS } from '../lib/c2pa/vocabulary.mjs';
 import { deriveWithProvenance } from '../lib/derive.mjs';
@@ -101,4 +102,12 @@ test('data URIs that are not base64 JPEG, PNG or WebP are rejected', () => {
     for (const uri of [undefined, 'data:,', 'data:text/html;base64,PGI+', 'data:image/png,raw']) {
         assert.throws(() => ImageAsset.fromDataUri(uri), RangeError, String(uri));
     }
+});
+
+test('Provenance.of embeds the claim thumbnail of every manifest as a data URI', async () => {
+    const provenance = await Provenance.of(original, signing.context);
+    const { identifier } = provenance.store.manifests[provenance.manifestId].thumbnail;
+
+    assert.match(provenance.thumbnails[identifier], /^data:image\/jpeg;base64,/);
+    assert.equal(provenance.toJSON().thumbnails, provenance.thumbnails);
 });

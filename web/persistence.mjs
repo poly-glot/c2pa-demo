@@ -1,7 +1,7 @@
 const DATABASE = 'c2pa-demo';
 const STORE = 'state';
 const KEY = 'current';
-const VERSION = 5;
+const VERSION = 6;
 
 const settle = (request) =>
     new Promise((resolve, reject) => {

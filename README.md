@@ -215,7 +215,7 @@ The composer works as follows:
 
 ### Credentials pane
 
-The pane has two tabs, Summary and Raw manifest.
+The pane has three tabs: Summary, Provenance and Raw manifest.
 
 The **Summary** tab shows, from top to bottom:
 
@@ -227,7 +227,9 @@ The **Summary** tab shows, from top to bottom:
 
 An unsigned image shows "No credentials" with the note "Nothing machine-readable says how this image was made or changed."
 
-The **Raw manifest** tab shows the reader's JSON for the layer, pretty-printed.
+The **Provenance** tab draws the ingredient chain as a tree. The root card is the open layer; below it sit its ingredients, labelled "Placed ingredient" for `componentOf` and "Edited from" for `parentOf`, each with its embedded thumbnail, a Signed or No credentials chip and its signer. An ingredient that carries its own manifest is expanded in turn, so a placed image that was itself edited shows the whole edit chain beneath it. The heading counts the ingredients in the chain. Clicking a card shows it under "Selected node" with its title, signer, format and a note on what its status means. An unsigned image has no chain to show.
+
+The **Raw manifest** tab shows the reader's JSON as a collapsible tree, open two levels deep. The search box narrows the tree to keys and values containing the text and highlights the hits. Expand all, Collapse all and Copy JSON sit above the tree.
 
 **Compare with previous version** opens a full-screen split view of the parent's manifest and the current layer's manifest, with changed lines paired row by row. It is disabled on the original, where the footer says "Make an edit to compare manifests side by side." Escape or Close returns to the page.
 
@@ -260,22 +262,23 @@ Errors return `{ "error": "message" }`. A `RangeError`, `SyntaxError` or `URIErr
 
 `/api/provenance` returns `Provenance.toJSON()`, with these keys:
 
-| Key                | Contents                                                             |
-| ------------------ | -------------------------------------------------------------------- |
-| `actions`          | the active manifest's actions as views                               |
-| `aiActions`        | the timeline views whose kind is not `not AI`                        |
-| `claimGenerator`   | `{ name, version }` of the active manifest, or `null`                |
-| `components`       | `componentOf` ingredients: `{ carriesManifest, title, slot }`        |
-| `failures`         | validation failures other than an untrusted signer                   |
-| `instanceId`       | the active manifest's instance identifier, or `null`                 |
-| `isValid`          | whether the validation state is `Valid` or `Trusted`                 |
-| `manifestId`       | the active manifest label                                            |
-| `parent`           | the `parentOf` ingredient as `{ carriesManifest, title }`, or `null` |
-| `parentManifestId` | the parent's manifest label, or `null`                               |
-| `signer`           | the certificate's common name and issuer                             |
-| `signerTrust`      | `c2pa`, `user` or `none`                                             |
-| `store`            | the reader's full JSON                                               |
-| `timeline`         | every action in the chain, newest manifest first                     |
+| Key                | Contents                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `actions`          | the active manifest's actions as views                                                                                         |
+| `aiActions`        | the timeline views whose kind is not `not AI`                                                                                  |
+| `claimGenerator`   | `{ name, version }` of the active manifest, or `null`                                                                          |
+| `components`       | `componentOf` ingredients: `{ carriesManifest, title, slot }`                                                                  |
+| `failures`         | validation failures other than an untrusted signer                                                                             |
+| `instanceId`       | the active manifest's instance identifier, or `null`                                                                           |
+| `isValid`          | whether the validation state is `Valid` or `Trusted`                                                                           |
+| `manifestId`       | the active manifest label                                                                                                      |
+| `parent`           | the `parentOf` ingredient as `{ carriesManifest, title }`, or `null`                                                           |
+| `parentManifestId` | the parent's manifest label, or `null`                                                                                         |
+| `signer`           | the certificate's common name and issuer                                                                                       |
+| `signerTrust`      | `c2pa`, `user` or `none`                                                                                                       |
+| `store`            | the reader's full JSON                                                                                                         |
+| `thumbnails`       | data URIs by resource identifier for every manifest's claim thumbnail and for the thumbnails of ingredients without a manifest |
+| `timeline`         | every action in the chain, newest manifest first                                                                               |
 
 Each action view has the keys `action`, `agent`, `description`, `digitalSourceType`, `kind` (`AI generated`, `AI manipulated`, `AI enhanced` or `not AI`), `manifestId`, `region` (`{ x, y, width, height }` or `null`), `title` and `when`.
 
@@ -379,8 +382,11 @@ web/features/compose-form.mjs form reads and slot choices for the composer
 web/features/compose.mjs      template composer: load a template, preview, render and sign
 web/features/compose-markup.mjs  markup for the composer
 web/features/compose.css      styles for the composer
-web/features/credentials.mjs  credentials pane: Summary and Raw manifest tabs, Compare button
+web/features/credentials.mjs  credentials pane: Summary, Provenance and Raw manifest tabs, Compare button
 web/features/credentials-markup.mjs  markup for the summary, timeline, ingredients and technical details
+web/features/json-tree.mjs    collapsible, searchable tree for the raw manifest
+web/features/provenance-graph.mjs  builds the ingredient tree from the manifest store
+web/features/provenance-markup.mjs  markup for the provenance tree and the selected node
 web/features/first-run.mjs    first-run cards for the samples and the file input
 web/features/header.mjs       status bar: file name, signature and AI chips, download button
 web/features/layer-select.mjs   the "Choose an image" select and its refill, shared by the toolbar and the composer

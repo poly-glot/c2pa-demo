@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+*.key
+*.srl
+node_modules/
+assets/
+.DS_Store
+.idea/
+.zvec-grep/
+.impeccable/

@@ -1,0 +1,16 @@
+[req]
+distinguished_name = dn
+prompt = no
+x509_extensions = v3
+
+[dn]
+C = NL
+CN = Storyteq C2PA TEST Claim Signer
+O = Storyteq
+
+[v3]
+authorityKeyIdentifier = keyid:always
+basicConstraints = critical, CA:FALSE
+extendedKeyUsage = critical, emailProtection
+keyUsage = critical, digitalSignature
+subjectKeyIdentifier = hash

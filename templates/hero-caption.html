@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en-GB">
+    <head>
+        <meta charset="utf-8" />
+        <title>Hero caption</title>
+        <style>
+            body {
+                background: #f9f9f9;
+                color: #1a1a1a;
+                font:
+                    28px/1.5 -apple-system,
+                    'Helvetica Neue',
+                    Helvetica,
+                    system-ui,
+                    sans-serif;
+                height: 1000px;
+                margin: 0;
+                position: relative;
+                width: 1600px;
+            }
+
+            img {
+                height: 100%;
+                object-fit: cover;
+                width: 100%;
+            }
+
+            div {
+                background: #ffffff;
+                border: 1px solid #e5e5e5;
+                bottom: 55px;
+                box-sizing: border-box;
+                left: 55px;
+                padding: 34px 55px;
+                position: absolute;
+                width: 890px;
+            }
+
+            h1 {
+                font-size: 55px;
+                font-weight: 600;
+                line-height: 1.2;
+                margin: 0 0 21px;
+            }
+
+            p {
+                color: #616161;
+                margin: 0;
+            }
+        </style>
+    </head>
+    <body data-width="1600" data-height="1000">
+        <img data-slot="hero" alt="" />
+        <div>
+            <h1 data-text="headline">Headline goes here</h1>
+            <p data-text="caption">A short caption that says what the picture shows.</p>
+        </div>
+    </body>
+</html>

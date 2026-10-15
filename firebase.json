@@ -1,0 +1,8 @@
+{
+    "hosting": {
+        "site": "c2pa-demo",
+        "public": "hosting",
+        "ignore": ["**/.*"],
+        "rewrites": [{ "source": "**", "run": { "serviceId": "c2pa-demo", "region": "europe-west2" } }]
+    }
+}

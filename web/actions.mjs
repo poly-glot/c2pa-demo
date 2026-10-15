@@ -1,0 +1,18 @@
+export const ACTION = Object.freeze({
+    colorAdjustments: 'c2pa.color_adjustments',
+    converted: 'c2pa.converted',
+    created: 'c2pa.created',
+    cropped: 'c2pa.cropped',
+    drawing: 'c2pa.drawing',
+    edited: 'c2pa.edited',
+    filtered: 'c2pa.filtered',
+    inpainting: 'c2pa.inpainting',
+    opened: 'c2pa.opened',
+    orientation: 'c2pa.orientation',
+    outpainting: 'c2pa.outpainting',
+    placed: 'c2pa.placed',
+    published: 'c2pa.published',
+    resized: 'c2pa.resized',
+    transcoded: 'c2pa.transcoded',
+    upscaled: 'c2pa.upscaled',
+});

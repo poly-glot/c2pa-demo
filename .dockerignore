@@ -1,0 +1,14 @@
+.codegraph
+.env
+.git
+.github
+.idea
+.impeccable
+.zvec-grep
+assets
+cert/*.key
+feedback
+hosting
+node_modules
+tasks
+test

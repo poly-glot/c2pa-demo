@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en-GB">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Content Credentials demo · sign in</title>
+        <style>
+            :root {
+                --accent: #2193b0;
+                --accent-strong: #1b7f99;
+                --danger: #b42318;
+                --hairline: #e5e5e5;
+                --ink: #1a1a1a;
+                --muted: #616161;
+                --paper: #ffffff;
+                --tray: #f9f9f9;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                background: var(--paper);
+                color: var(--ink);
+                display: flex;
+                flex-direction: column;
+                font:
+                    13px/1.5 -apple-system,
+                    'Helvetica Neue',
+                    Helvetica,
+                    system-ui,
+                    sans-serif;
+                margin: 0;
+                min-height: 100vh;
+            }
+
+            .masthead {
+                align-items: center;
+                border-bottom: 1px solid var(--hairline);
+                display: flex;
+                font-size: 15px;
+                font-weight: 700;
+                height: 64px;
+                letter-spacing: 0.02em;
+                padding: 0 34px;
+                text-transform: uppercase;
+            }
+
+            main {
+                align-items: center;
+                display: flex;
+                flex: 1;
+                justify-content: center;
+                padding: 34px 16px;
+            }
+
+            .card {
+                background: var(--tray);
+                border: 1px solid var(--hairline);
+                display: flex;
+                flex-direction: column;
+                gap: 13px;
+                max-width: 420px;
+                padding: 34px;
+                width: 100%;
+            }
+
+            h1 {
+                font-size: 21px;
+                line-height: 1.2;
+                margin: 0;
+            }
+
+            p {
+                color: var(--muted);
+                margin: 0;
+            }
+
+            label {
+                color: var(--muted);
+                font-size: 11px;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+            }
+
+            input {
+                background: var(--paper);
+                border: 1px solid var(--ink);
+                border-radius: 0;
+                color: var(--ink);
+                font: inherit;
+                height: 44px;
+                padding: 0 13px;
+                width: 100%;
+            }
+
+            input:focus {
+                outline: 2px solid var(--accent);
+                outline-offset: 2px;
+            }
+
+            button {
+                background: var(--accent);
+                border: 0;
+                border-radius: 0;
+                color: var(--paper);
+                cursor: pointer;
+                font-family: inherit;
+                font-size: 13px;
+                font-weight: 700;
+                height: 44px;
+                line-height: 1;
+                padding: 0 21px;
+            }
+
+            button:hover {
+                background: var(--accent-strong);
+            }
+
+            .error {
+                color: var(--danger);
+                min-height: 1.5em;
+            }
+        </style>
+    </head>
+    <body>
+        <header class="masthead">Content Credentials</header>
+        <main>
+            <form class="card">
+                <h1>Sign in to the demo</h1>
+                <p>This demo is password protected. Enter the password to open it.</p>
+                <label for="password">Password</label>
+                <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autocomplete="current-password"
+                    required
+                    autofocus
+                />
+                <button type="submit">Open the demo</button>
+                <p class="error" aria-live="polite"></p>
+            </form>
+        </main>
+        <script>
+            const form = document.querySelector('form');
+            const error = form.querySelector('.error');
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                error.textContent = '';
+
+                const response = await fetch('/api/session', {
+                    body: JSON.stringify({ password: form.password.value }),
+                    headers: { 'content-type': 'application/json' },
+                    method: 'POST',
+                });
+                if (response.ok) return location.reload();
+
+                error.textContent = response.status === 401 ? 'Wrong password.' : 'Something went wrong, try again.';
+            });
+        </script>
+    </body>
+</html>

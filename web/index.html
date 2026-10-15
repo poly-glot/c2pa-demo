@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en-GB">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Content Credentials demo</title>
+        <link rel="stylesheet" href="/app.css" />
+        <link rel="stylesheet" href="/features/compose.css" />
+        <script type="module" src="/app.mjs"></script>
+    </head>
+    <body>
+        <header class="masthead">
+            <span class="masthead__title">Content Credentials</span>
+            <a class="masthead__source" href="https://github.com/poly-glot/c2pa-demo">
+                Source
+                <svg
+                    width="21"
+                    height="21"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                >
+                    <path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z"></path>
+                    <path d="M9 12l2 2 4-4"></path>
+                </svg>
+            </a>
+        </header>
+
+        <div class="status-bar" data-status-bar>
+            <div class="status-bar__state" data-state aria-live="polite"></div>
+            <div class="status-bar__actions">
+                <button class="is-quiet" type="button" data-reset>Reset demo</button>
+                <button class="is-quiet" type="button" data-logout hidden>Log out</button>
+                <button type="button" data-compose>New from template</button>
+                <button class="is-primary" type="button" data-download disabled>Download signed JPEG</button>
+            </div>
+        </div>
+        <p class="storage-note" data-storage-note role="alert"></p>
+
+        <div class="workspace">
+            <main class="workspace__main">
+                <section class="first-run" data-first-run>
+                    <div class="first-run__intro">
+                        <div class="first-run__lead">
+                            <h1 class="first-run__headline">See how edits are recorded in an image's credentials.</h1>
+                            <p class="first-run__standfirst">
+                                Open an image, make a manual or AI edit, and watch the C2PA manifest update. Every
+                                version you download is signed.
+                            </p>
+                        </div>
+                        <ol class="steps">
+                            <li class="steps__item is-current">
+                                <span class="steps__number">01</span><span class="label">Pick a source</span>
+                            </li>
+                            <li class="steps__item">
+                                <span class="steps__number">02</span><span class="label">Edit it</span>
+                            </li>
+                            <li class="steps__item">
+                                <span class="steps__number">03</span><span class="label">Verify the credentials</span>
+                            </li>
+                            <li class="steps__item">
+                                <span class="steps__number">04</span><span class="label">Download signed</span>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <div class="first-run__start">
+                        <div class="dropzone" data-dropzone>
+                            <svg
+                                class="dropzone__icon"
+                                width="32"
+                                height="32"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                            >
+                                <path d="M12 16V5M7 10l5-5 5 5M4 20h16"></path>
+                            </svg>
+                            <span class="dropzone__title">Drop a JPEG, PNG or WebP here</span>
+                            <span class="hint"
+                                >Images with existing credentials keep their history; others start a new one.</span
+                            >
+                            <button class="is-primary dropzone__choose" type="button" data-choose>Choose a file</button>
+                            <input type="file" data-file hidden />
+                        </div>
+                        <div class="samples">
+                            <span class="samples__title">No image? Try one of these:</span>
+                            <div class="samples__grid" data-samples></div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="editor" data-editor hidden>
+                    <section class="sources" data-sources></section>
+                    <section class="canvas" id="canvas" data-canvas></section>
+                    <section class="toolbar" aria-label="Edit tools" data-toolbar></section>
+                </div>
+            </main>
+
+            <aside class="credentials" id="credentials" aria-label="Content credentials" data-credentials></aside>
+        </div>
+
+        <dialog class="compose" data-compose-dialog></dialog>
+        <dialog class="manifest__dialog" aria-label="Compare manifests" data-compare-dialog></dialog>
+
+        <footer class="colophon">
+            Samples: NOVA bottle by DAT Create (test certificate), mountain lake by Alexey Topolyanskiy on
+            <a href="https://unsplash.com">Unsplash</a>, library photograph by
+            <a href="https://truepic.com">Truepic</a>
+        </footer>
+    </body>
+</html>

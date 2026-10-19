@@ -69,7 +69,7 @@ test('export, reencode and place extensions', () => {
     assert.equal(byId.exportWebp.edit(PARAMS).format, 'image/webp');
     assert.equal(byId.reencode.edit(PARAMS).quality, 70);
     assert.deepEqual(byId.placeImage.edit(PARAMS).placed, { slot: 'overlay' });
-    assert.equal(byId.placeImage.edit(PARAMS).description, 'Placed Logo at 10,20 30×40');
+    assert.equal(byId.placeImage.edit(PARAMS).description, 'Placed an image at 10,20 30×40');
     assert.equal(byId.publish.mode, 'publish');
 });
 

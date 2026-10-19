@@ -8,6 +8,7 @@
         "check": "npm run lint && npm run prettier:check && npm test && npm run selfcheck -- ./samples/NOVA-SPK-500ML_Hero_Studio_2400x2400_AI-Generated_DAT-Create.jpg ./assets/selfcheck.jpg",
         "lint": "eslint .",
         "prettier": "prettier --write .",
+        "reference-clip": "node --env-file-if-exists=.env scripts/reference-clip.mjs",
         "prettier:check": "prettier --check .",
         "selfcheck": "SELFCHECK=1 node --env-file-if-exists=.env main.mjs",
         "serve": "node --env-file-if-exists=.env server.mjs",

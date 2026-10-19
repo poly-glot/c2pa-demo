@@ -1,4 +1,4 @@
-import { escape } from '../dom.mjs';
+import { escape, isVideo } from '../dom.mjs';
 
 const EMPTY_OPTION = '<option value="">Choose an image</option>';
 
@@ -7,8 +7,8 @@ const layerLabel = (source, index) => `${source.title} · ${index ? `Edit ${inde
 const layerOptions = (sources) =>
     sources
         .flatMap((source) =>
-            source.layers.map(
-                (layer, index) => `<option value="${layer.id}">${escape(layerLabel(source, index))}</option>`,
+            source.layers.map((layer, index) =>
+                isVideo(layer.image) ? '' : `<option value="${layer.id}">${escape(layerLabel(source, index))}</option>`,
             ),
         )
         .join('');

@@ -9,9 +9,11 @@ import { Provenance } from './lib/c2pa/provenance.mjs';
 import { loadReaderContext } from './lib/c2pa/context.mjs';
 import { loadLocalSigner } from './lib/c2pa/signer.mjs';
 import { composeWithProvenance } from './lib/compose.mjs';
+import { createWithProvenance } from './lib/create.mjs';
 import { deriveWithProvenance } from './lib/derive.mjs';
 import { ImageAsset, mimeTypeOf } from './lib/image-asset.mjs';
 import { GatewayImageEditor } from './lib/image-editors.mjs';
+import { describeVideoEdit, reencode, VIDEO_KINDS } from './lib/video.mjs';
 
 const WEB_DIR = fileURLToPath(new URL('./web/', import.meta.url));
 const SAMPLES_DIR = fileURLToPath(new URL('./samples/', import.meta.url));
@@ -23,6 +25,7 @@ const STATIC_TYPES = new Map([
 ]);
 const MANUAL_AGENT = { name: 'Browser canvas editor' };
 const TEMPLATE_AGENT = { name: 'Browser template renderer' };
+const VIDEO_AGENT = { name: 'ffmpeg' };
 const isTemplate = (name) => extname(name) === '.html';
 
 const config = loadConfig();
@@ -41,8 +44,14 @@ const manualEdit = ({ description, kind, region }) =>
 const api = {
     'GET /api/samples': async () => (await readdir(SAMPLES_DIR)).filter(mimeTypeOf).sort(),
     'GET /api/templates': async () => (await readdir(TEMPLATES_DIR)).filter(isTemplate).sort(),
+    'POST /api/create': async ({ prompt, title = 'generated' }) => {
+        if (typeof prompt !== 'string' || !prompt.trim()) throw new RangeError('expected a non-empty prompt');
+
+        const generated = (await editor.generate(prompt, title)).retitledAs(title);
+        return createWithProvenance(signing, { agent: editor.agent, generated });
+    },
     'POST /api/edits/ai': async ({ input, instruction, kind, parent, region, title }) => {
-        const edit = new AiEdit({ agent: editor.agent, instruction, kind, region });
+        const edit = new AiEdit({ agent: editor.agent, kind, region });
         const original = assetOf(parent);
         const edited = (
             await editor.edit(input ? assetOf({ image: input, title: parent.title }) : original, instruction)
@@ -56,7 +65,7 @@ const api = {
             original: assetOf(parent),
             placed: placed && { asset: assetOf(placed), slot: placed.slot },
         }),
-    'POST /api/edits/template': ({ components, rendered, text = {}, title }) => {
+    'POST /api/edits/template': ({ components, rendered, title }) => {
         if (!Array.isArray(components)) throw new RangeError('expected a list of components');
 
         return composeWithProvenance(
@@ -68,9 +77,20 @@ const api = {
                     slot,
                 })),
                 rendered: ImageAsset.fromDataUri(rendered).retitledAs(title),
-                text,
             },
         );
+    },
+    'POST /api/edits/video': async ({ kind, parent, title, width }) => {
+        if (!VIDEO_KINDS.has(kind)) throw new RangeError(`unsupported video edit: ${kind}`);
+
+        const original = assetOf(parent);
+        const edited = (await reencode(original, { kind, width })).retitledAs(title);
+        const description = describeVideoEdit({ kind, width });
+        return deriveWithProvenance(signing, {
+            edit: new ManualEdit({ agent: VIDEO_AGENT, description, kind }),
+            edited,
+            original,
+        });
     },
     'POST /api/provenance': (image) => Provenance.of(assetOf(image), signing.context),
 };

@@ -3,3 +3,4 @@ package-lock.json
 *.jpg
 *.png
 .impeccable/
+feedback/

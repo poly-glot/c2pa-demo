@@ -25,9 +25,7 @@ export function describe(view) {
     if (view.action === ACTION.opened) return 'Opened previous version';
 
     if (isAi(view)) {
-        const verb =
-            AI_VERBS[`${view.action}:${view.kind}`] ?? AI_VERBS[view.action] ?? `${humanise(view.action)} with AI`;
-        return view.description ? `${verb}: “${view.description}”` : verb;
+        return AI_VERBS[`${view.action}:${view.kind}`] ?? AI_VERBS[view.action] ?? `${humanise(view.action)} with AI`;
     }
 
     if (view.action === ACTION.created) return `Created in ${view.agent}`;
@@ -44,17 +42,10 @@ export function markerOf(view, manifestId) {
     return view.manifestId === manifestId ? 'current' : 'earlier';
 }
 
-export function aiStatus(timeline) {
-    if (timeline.some((view) => view.kind === 'AI generated')) return 'AI generated';
-
-    return timeline.some(isAi) ? 'AI edited' : NO_AI;
-}
-
 export function credentialStatus(provenance) {
     if (!provenance) return { label: 'No credentials', tone: 'none' };
 
-    const ai = aiStatus(provenance.timeline);
-    if (ai !== NO_AI) return { label: ai, tone: 'ai' };
+    if (provenance.aiDeclaration) return { label: provenance.aiDeclaration, tone: 'ai' };
 
     return { label: provenance.signerTrust === 'c2pa' ? 'Camera signed' : 'Signed', tone: 'ok' };
 }

@@ -22,7 +22,6 @@ function nodeOf(manifests, { ingredient, kind, manifestId }, ancestors) {
         format: ingredient?.format ?? manifest?.format ?? null,
         kind,
         signer: manifest?.signature_info?.common_name ?? null,
-        thumbnail: (manifest?.thumbnail ?? ingredient?.thumbnail)?.identifier ?? null,
         title: ingredient?.title ?? manifest?.title ?? 'Untitled',
     };
 }

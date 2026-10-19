@@ -1,5 +1,5 @@
 import { DEFAULT_BRUSH } from '../edits/canvas-ops.mjs';
-import { escape, plural, tab, versionLabel } from '../dom.mjs';
+import { escape, isVideo, mediaMarkup, plural, tab, versionLabel } from '../dom.mjs';
 
 const versionTab = (layer, index, selected) => tab(versionLabel(index), layer === selected, 'layer', layer.id);
 
@@ -37,19 +37,27 @@ export function barMarkup({ selectedLayer, selectedSource, view }, size) {
 export function noticeMarkup({ selectedLayer, view }) {
     if (view.fresh?.layerId !== selectedLayer.id) return '';
 
+    if (!selectedLayer.provenance)
+        return `
+        <span class="chip is-strong">Edit applied, not signed</span>
+        <span class="muted">Nothing in this image's history is AI-declared, so no manifest was written.</span>`;
+
     return `
         <span class="chip is-ok is-strong">Edit applied and signed</span>
         <span class="muted">${escape(view.fresh.label)} is now declared in the credentials.</span>
         <a href="#credentials">See what changed</a>`;
 }
 
-export const stageMarkup = (layer) => `
-    <div class="preview">
-        <img class="preview__image" src="${layer.image}" alt="${escape(layer.title)}" draggable="false" />
+const overlayMarkup = () => `
         <svg class="preview__overlay" preserveAspectRatio="none" aria-hidden="true">
             <rect class="preview__marquee" visibility="hidden" />
             <g class="preview__strokes" fill="none" stroke="${DEFAULT_BRUSH.colour}" stroke-linecap="round" stroke-linejoin="round" stroke-width="${DEFAULT_BRUSH.width}"></g>
-        </svg>
+        </svg>`;
+
+export const stageMarkup = (layer) => `
+    <div class="preview">
+        ${mediaMarkup(layer.image, 'preview__image', { alt: layer.title, controls: true })}
+        ${isVideo(layer.image) ? '' : overlayMarkup()}
     </div>`;
 
 export const polyline = (points) => `<polyline points="${points.map(({ x, y }) => `${x},${y}`).join(' ')}" />`;

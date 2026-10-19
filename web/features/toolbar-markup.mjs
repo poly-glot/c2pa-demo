@@ -1,6 +1,6 @@
 import { escape } from '../dom.mjs';
 import { layerSelect } from './layer-select.mjs';
-import { SLIDER_LABELS, TOOL_BY_ID, TOOLS, UNCHANGED_PERCENT } from '../edits/registry.mjs';
+import { SLIDER_LABELS, TOOL_BY_ID, TOOLS, UNCHANGED_PERCENT, VIDEO_TOOLS } from '../edits/registry.mjs';
 
 const AI_NOTE =
     'AI edits are declared in the credentials with an AI <span class="mono">digitalSourceType</span>, so viewers can tell them from manual adjustments.';
@@ -54,7 +54,7 @@ const primaryRow = () => `
     <div class="toolbar__row">
         <span class="label">Adjust</span>
         ${PRIMARY_TOOLS.map((tool) => (tool.id === 'resize' ? resizeControl(tool) : primaryButton(tool))).join('')}
-        <span class="hint toolbar__hint">Adjustments are signed as manual edits</span>
+        <span class="hint toolbar__hint">Adjustments are signed as manual edits once the image carries AI</span>
     </div>`;
 
 function groupRows(tools) {
@@ -84,15 +84,36 @@ const advancedSection = () => `
         <div class="advanced__body">${groupRows(ADVANCED_TOOLS).join('')}</div>
     </details>`;
 
-export const lastEditNote = (caption, kind) =>
-    `Last edit: “${escape(caption)}” · recorded as <span class="mono">${escape(kind)}</span>.`;
+export const lastEditNote = (caption, kind, signed) =>
+    signed
+        ? `Last edit: “${escape(caption)}” · recorded as <span class="mono">${escape(kind)}</span>.`
+        : `Last edit: “${escape(caption)}” · not signed, nothing in this image's history is AI-declared.`;
+
+const videoRow = () => {
+    const [transcode, resize] = VIDEO_TOOLS;
+
+    return `
+    <div class="toolbar__row" data-video-tools hidden>
+        <span class="label">Video</span>
+        <button class="tool" type="button" data-tool="${transcode.id}">${escape(transcode.label)}</button>
+        <span class="tool tool--split">
+            <button class="tool__action" type="button" data-tool="${resize.id}">${ICONS.resize}${escape(resize.label)}</button>
+            <input class="tool__width mono" type="number" name="videoWidth" min="16" step="2" value="640" aria-label="Width in pixels" />
+            <span class="tool__unit mono">px</span>
+        </span>
+        <span class="hint toolbar__hint">Re-encoded on the server; signed with the source as parent when the clip carries AI</span>
+    </div>`;
+};
 
 export const toolbarMarkup = () => `
-    ${primaryRow()}
-    <form class="ai-bar" data-ai-bar>
-        <label class="label ai-bar__label" for="ai-prompt">${ICONS.sparkle}${escape(PROMPT_TOOL.label)}</label>
-        <input class="ai-bar__input" id="ai-prompt" name="prompt" placeholder="Describe a change, e.g. “Make the sky overcast”" />
-        <button class="is-primary" type="submit">Generate edit</button>
-    </form>
+    ${videoRow()}
+    <div class="toolbar__tools" data-image-tools>
+        ${primaryRow()}
+        <form class="ai-bar" data-ai-bar>
+            <label class="label ai-bar__label" for="ai-prompt">${ICONS.sparkle}${escape(PROMPT_TOOL.label)}</label>
+            <input class="ai-bar__input" id="ai-prompt" name="prompt" placeholder="Describe a change, e.g. “Make the sky overcast”" />
+            <button class="is-primary" type="submit">Generate edit</button>
+        </form>
+    </div>
     <p class="hint" aria-live="polite" data-note>${AI_NOTE}</p>
-    ${advancedSection()}`;
+    <div data-image-tools>${advancedSection()}</div>`;

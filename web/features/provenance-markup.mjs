@@ -1,4 +1,4 @@
-import { chip, escape, plural } from '../dom.mjs';
+import { chip, escape, mediaMarkup, plural } from '../dom.mjs';
 import { countIngredients, nodeAt, provenanceGraph, ROOT_PATH } from './provenance-graph.mjs';
 
 const ROOT_NOTE = "This file's own manifest. Everything below is what it declares it was made from.";
@@ -8,15 +8,15 @@ const NO_CREDENTIALS = '<p class="muted">No credentials, so there is no provenan
 
 const status = (node) => (node.signer ? chip('Signed', 'ok') : chip('No credentials', 'none'));
 
-function thumb(node, srcOf, className) {
-    const src = srcOf(node);
+function thumb(node, imageByTitle, className) {
+    const src = imageByTitle.get(node.title);
 
-    return src ? `<img class="${className}" src="${src}" alt="" />` : `<span class="${className}"></span>`;
+    return src ? mediaMarkup(src, className) : `<span class="${className}"></span>`;
 }
 
-const card = (node, path, srcOf) => `
+const card = (node, path, imageByTitle) => `
     <button class="chain__card" type="button" data-node="${path}" aria-pressed="${path === ROOT_PATH}">
-        ${thumb(node, srcOf, 'chain__thumb')}
+        ${thumb(node, imageByTitle, 'chain__thumb')}
         <span class="chain__text">
             <span class="label chain__kind">${node.kind}</span>
             ${status(node)}
@@ -25,10 +25,10 @@ const card = (node, path, srcOf) => `
         </span>
     </button>`;
 
-const branch = (node, path, srcOf) => `
+const branch = (node, path, imageByTitle) => `
     <li class="chain__node">
-        ${card(node, path, srcOf)}
-        ${node.children.length ? `<ul class="chain__children">${node.children.map((child, index) => branch(child, `${path}.${index}`, srcOf)).join('')}</ul>` : ''}
+        ${card(node, path, imageByTitle)}
+        ${node.children.length ? `<ul class="chain__children">${node.children.map((child, index) => branch(child, `${path}.${index}`, imageByTitle)).join('')}</ul>` : ''}
     </li>`;
 
 const noteOf = (node, path) => {
@@ -37,13 +37,13 @@ const noteOf = (node, path) => {
     return node.signer ? SIGNED_NOTE : UNSIGNED_NOTE;
 };
 
-export const selectedNode = (graph, path, srcOf) => {
+export const selectedNode = (graph, path, imageByTitle) => {
     const node = nodeAt(graph, path);
 
     return `
     <h3 class="label">Selected node</h3>
     <div class="chain__selected">
-        ${thumb(node, srcOf, 'chain__preview')}
+        ${thumb(node, imageByTitle, 'chain__preview')}
         <div class="chain__selected-text">
             <span class="chain__kind-row"><span class="label">${node.kind}</span>${status(node)}</span>
             <span class="chain__selected-title">${escape(node.title)}</span>
@@ -57,7 +57,7 @@ export const selectedNode = (graph, path, srcOf) => {
 const headline = (count) =>
     count ? `${plural(count, 'ingredient')} in the provenance chain` : 'No ingredients declared';
 
-export function provenanceView(provenance, srcOf) {
+export function provenanceView(provenance, imageByTitle) {
     if (!provenance) return NO_CREDENTIALS;
 
     const graph = provenanceGraph(provenance.store);
@@ -68,7 +68,7 @@ export function provenanceView(provenance, srcOf) {
             <h3 class="label">Provenance</h3>
             <span class="muted">${headline(countIngredients(graph))}</span>
         </div>
-        <div class="chain__scroll"><ul class="chain__tree">${branch(graph, ROOT_PATH, srcOf)}</ul></div>
-        <div class="chain__detail" data-node-detail>${selectedNode(graph, ROOT_PATH, srcOf)}</div>
+        <div class="chain__scroll"><ul class="chain__tree">${branch(graph, ROOT_PATH, imageByTitle)}</ul></div>
+        <div class="chain__detail" data-node-detail>${selectedNode(graph, ROOT_PATH, imageByTitle)}</div>
     </section>`;
 }

@@ -1,14 +1,23 @@
-import { chip, download, escape, versionLabel } from '../dom.mjs';
-import { aiStatus, NO_AI } from './timeline.mjs';
+import { chip, download, escape, mimeOf, versionLabel } from '../dom.mjs';
+import { NO_AI } from './timeline.mjs';
 
 const READY = '<span class="label">Application is ready to use</span>';
+
+const FORMAT_NAMES = { 'image/jpeg': 'JPEG', 'image/png': 'PNG', 'image/webp': 'WebP', 'video/mp4': 'MP4' };
+
+export function downloadLabel(layer) {
+    if (!layer) return 'Download';
+
+    const signed = layer.provenance ? 'signed ' : '';
+    return `Download ${signed}${FORMAT_NAMES[mimeOf(layer.image)] ?? 'file'}`;
+}
 
 function credentialChips(provenance) {
     if (!provenance) return chip('No credentials', 'none');
 
-    const ai = aiStatus(provenance.timeline);
     const signature = provenance.isValid ? chip('Signature valid', 'ok') : chip('Signature NOT valid', 'bad');
-    return signature + chip(ai, ai === NO_AI ? 'none' : 'ai');
+    const { aiDeclaration } = provenance;
+    return signature + (aiDeclaration ? chip(aiDeclaration, 'ai') : chip(NO_AI, 'none'));
 }
 
 function stateMarkup(source, layer) {
@@ -26,6 +35,7 @@ export function mountHeader(root, store) {
 
     store.subscribe(({ selectedLayer, selectedSource }) => {
         downloadButton.disabled = !selectedLayer;
+        downloadButton.textContent = downloadLabel(selectedLayer);
         state.innerHTML = selectedLayer ? stateMarkup(selectedSource, selectedLayer) : READY;
     });
 

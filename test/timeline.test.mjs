@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { aiStatus, credentialStatus, describe, markerOf, newestFirst } from '../web/features/timeline.mjs';
+import { credentialStatus, describe, markerOf, newestFirst } from '../web/features/timeline.mjs';
 
 const view = (action, extra = {}) => ({
     action,
@@ -15,7 +15,7 @@ const view = (action, extra = {}) => ({
 const AI_EDIT = view('c2pa.edited', { description: 'Make the sky overcast', kind: 'AI manipulated' });
 
 test('describe names the action in plain words', () => {
-    assert.equal(describe(AI_EDIT), 'Edited with AI: “Make the sky overcast”');
+    assert.equal(describe(AI_EDIT), 'Edited with AI');
     assert.equal(describe(view('c2pa.opened')), 'Opened previous version');
     assert.equal(describe(view('c2pa.created')), 'Created in demo');
     assert.equal(
@@ -23,7 +23,7 @@ test('describe names the action in plain words', () => {
         'Cropped to 800×600 at 10,20',
     );
     assert.equal(describe(view('c2pa.color_adjustments')), 'Color adjustments');
-    assert.equal(describe(view('c2pa.upscaled', { kind: 'AI enhanced' })), 'Upscaled with AI');
+    assert.equal(describe(view('c2pa.upscaled', { kind: 'AI manipulated' })), 'Upscaled with AI');
 });
 
 test('newestFirst keeps manifest order and reverses actions within each manifest', () => {
@@ -40,18 +40,22 @@ test('markerOf separates AI, this manifest and earlier manifests', () => {
     assert.equal(markerOf(view('c2pa.opened'), 'urn:other'), 'earlier');
 });
 
-test('aiStatus prefers generated over edited', () => {
-    assert.equal(aiStatus([]), 'No AI content');
-    assert.equal(aiStatus([AI_EDIT]), 'AI edited');
-    assert.equal(aiStatus([AI_EDIT, view('c2pa.created', { kind: 'AI generated' })]), 'AI generated');
-});
-
-test('credentialStatus labels samples by what their credentials declare', () => {
+test('credentialStatus labels by the AI declaration the reader reports', () => {
     assert.deepEqual(credentialStatus(null), { label: 'No credentials', tone: 'none' });
-    assert.deepEqual(credentialStatus({ signerTrust: 'user', timeline: [AI_EDIT] }), {
+    assert.deepEqual(credentialStatus({ aiDeclaration: 'AI edited', signerTrust: 'user', timeline: [] }), {
         label: 'AI edited',
         tone: 'ai',
     });
-    assert.deepEqual(credentialStatus({ signerTrust: 'c2pa', timeline: [] }), { label: 'Camera signed', tone: 'ok' });
-    assert.deepEqual(credentialStatus({ signerTrust: 'user', timeline: [] }), { label: 'Signed', tone: 'ok' });
+    assert.deepEqual(credentialStatus({ aiDeclaration: 'AI generated', signerTrust: 'c2pa', timeline: [AI_EDIT] }), {
+        label: 'AI generated',
+        tone: 'ai',
+    });
+    assert.deepEqual(credentialStatus({ aiDeclaration: null, signerTrust: 'c2pa', timeline: [] }), {
+        label: 'Camera signed',
+        tone: 'ok',
+    });
+    assert.deepEqual(credentialStatus({ aiDeclaration: null, signerTrust: 'user', timeline: [] }), {
+        label: 'Signed',
+        tone: 'ok',
+    });
 });

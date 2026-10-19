@@ -18,7 +18,7 @@ function parseArguments([input, output, instruction], config) {
 async function recolourWithProvenance({ editor, ...signing }, { input, instruction, output }) {
     const original = await ImageAsset.fromFile(input);
     const edited = (await editor.edit(original, instruction)).retitled(basename(output));
-    const edit = new AiEdit({ agent: editor.agent, instruction });
+    const edit = new AiEdit({ agent: editor.agent });
 
     const { image, provenance } = await deriveWithProvenance(signing, { edit, edited, original });
     await mkdir(dirname(output), { recursive: true });

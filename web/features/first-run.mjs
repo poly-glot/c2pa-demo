@@ -1,4 +1,5 @@
-import { ACCEPTED_IMAGES, chip, escape } from '../dom.mjs';
+import { ACCEPTED_MEDIA, chip, escape, mediaMarkup } from '../dom.mjs';
+import { generateMarkup, mountGenerate } from './generate.mjs';
 import { addChosenFile, displayName } from './sources.mjs';
 import { credentialStatus } from './timeline.mjs';
 
@@ -7,7 +8,7 @@ function card(source) {
 
     return `
         <button class="card" type="button" data-source="${source.id}">
-            <img class="card__image" src="${source.layers[0].image}" alt="" />
+            ${mediaMarkup(source.layers[0].image, 'card__image')}
             <span class="card__body">
                 <span class="card__title">${escape(displayName(source))}</span>
                 ${chip(label, tone)}
@@ -17,6 +18,9 @@ function card(source) {
 
 export function mountFirstRun(root, store) {
     const samples = root.querySelector('[data-samples]');
+
+    root.querySelector('[data-generate-slot]').innerHTML = generateMarkup();
+    mountGenerate(root, store);
 
     store.subscribe(({ sources }) => {
         samples.innerHTML = sources.map(card).join('');
@@ -29,7 +33,7 @@ export function mountFirstRun(root, store) {
 
     const input = root.querySelector('[data-file]');
     const zone = root.querySelector('[data-dropzone]');
-    input.accept = ACCEPTED_IMAGES;
+    input.accept = ACCEPTED_MEDIA;
     input.addEventListener('change', () => addChosenFile(store, input));
     root.querySelector('[data-choose]').addEventListener('click', () => input.click());
 

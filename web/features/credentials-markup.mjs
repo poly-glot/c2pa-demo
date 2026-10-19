@@ -1,5 +1,5 @@
 import { ACTION } from '../actions.mjs';
-import { chip, escape, plural, tab } from '../dom.mjs';
+import { chip, escape, mediaMarkup, plural, tab } from '../dom.mjs';
 import { jsonTree } from './json-tree.mjs';
 import { describe, isAi, markerOf, newestFirst, sourceTypeOf } from './timeline.mjs';
 
@@ -59,10 +59,11 @@ const unsigned = () => `
         </div>
     </section>`;
 
-function facts({ claimGenerator, timeline }) {
+function facts({ aiDeclaration, claimGenerator, timeline }) {
     const aiCount = timeline.filter(isAi).length;
-    const ai = aiCount
-        ? `<dd class="facts__value is-ai">${plural(aiCount, 'AI action')} declared</dd>`
+    const aiActions = aiCount ? ` · ${plural(aiCount, 'AI action')}` : '';
+    const ai = aiDeclaration
+        ? `<dd class="facts__value is-ai">${escape(aiDeclaration)}${aiActions}</dd>`
         : '<dd class="facts__value">None declared</dd>';
     const generator = claimGenerator
         ? `${escape(claimGenerator.name)} <span class="mono muted">${escape(claimGenerator.version ?? '')}</span>`
@@ -118,9 +119,7 @@ function timeline(provenance, fresh) {
 
 function ingredient({ carriesManifest, relationship, title }, imageByTitle) {
     const image = imageByTitle.get(title);
-    const thumb = image
-        ? `<img class="ingredient__thumb" src="${image}" alt="" />`
-        : '<span class="ingredient__thumb"></span>';
+    const thumb = image ? mediaMarkup(image, 'ingredient__thumb') : '<span class="ingredient__thumb"></span>';
 
     return `
         <li class="ingredient">

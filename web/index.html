@@ -36,7 +36,7 @@
                 <button class="is-quiet" type="button" data-reset>Reset demo</button>
                 <button class="is-quiet" type="button" data-logout hidden>Log out</button>
                 <button type="button" data-compose>New from template</button>
-                <button class="is-primary" type="button" data-download disabled>Download signed JPEG</button>
+                <button class="is-primary" type="button" data-download disabled>Download</button>
             </div>
         </div>
         <p class="storage-note" data-storage-note role="alert"></p>
@@ -48,8 +48,8 @@
                         <div class="first-run__lead">
                             <h1 class="first-run__headline">See how edits are recorded in an image's credentials.</h1>
                             <p class="first-run__standfirst">
-                                Open an image, make a manual or AI edit, and watch the C2PA manifest update. Every
-                                version you download is signed.
+                                Open an image, make a manual or AI edit, and watch the C2PA manifest update. Images that
+                                carry AI are signed; images without AI stay unsigned.
                             </p>
                         </div>
                         <ol class="steps">
@@ -63,7 +63,7 @@
                                 <span class="steps__number">03</span><span class="label">Verify the credentials</span>
                             </li>
                             <li class="steps__item">
-                                <span class="steps__number">04</span><span class="label">Download signed</span>
+                                <span class="steps__number">04</span><span class="label">Download</span>
                             </li>
                         </ol>
                     </div>
@@ -84,13 +84,14 @@
                             >
                                 <path d="M12 16V5M7 10l5-5 5 5M4 20h16"></path>
                             </svg>
-                            <span class="dropzone__title">Drop a JPEG, PNG or WebP here</span>
+                            <span class="dropzone__title">Drop a JPEG, PNG, WebP or MP4 here</span>
                             <span class="hint"
                                 >Images with existing credentials keep their history; others start a new one.</span
                             >
                             <button class="is-primary dropzone__choose" type="button" data-choose>Choose a file</button>
                             <input type="file" data-file hidden />
                         </div>
+                        <div data-generate-slot></div>
                         <div class="samples">
                             <span class="samples__title">No image? Try one of these:</span>
                             <div class="samples__grid" data-samples></div>

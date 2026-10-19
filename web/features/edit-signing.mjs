@@ -1,5 +1,5 @@
 import { api } from '../api.mjs';
-import { fileStem, loadImage } from '../dom.mjs';
+import { fileStem, loadImage, mimeOf } from '../dom.mjs';
 import { encode, JPEG } from '../edits/canvas-ops.mjs';
 
 const MISSING = {
@@ -18,8 +18,6 @@ export const missingInput = (tool, params) =>
 
 export const nextTitle = (source) => `${fileStem(source.title)}_v${source.layers.length + 1}`;
 
-const mimeOf = (dataUri) => dataUri.slice(5, dataUri.indexOf(';'));
-
 const encodeEdit = (canvas, { format, quality }, parentFormat) =>
     quality ? encode(canvas, JPEG, quality / 100) : encode(canvas, format ?? parentFormat);
 
@@ -37,8 +35,16 @@ async function signAi(tool, parent, params, title) {
     const input = tool.prepare && encode(tool.prepare(await loadImage(parent.image), params), mimeOf(parent.image));
     const result = await api.aiEdit(parent, { ...request, input }, title);
 
-    return { ...result, caption: params.prompt, kind: request.kind };
+    return { ...result, caption: tool.label, kind: request.kind };
 }
 
-export const signEdit = (tool, parent, params, title) =>
-    (tool.mode === 'ai' ? signAi : signManual)(tool, parent, params, title);
+async function signVideo(tool, parent, params, title) {
+    const edit = tool.edit(params);
+    const result = await api.videoEdit(parent, { kind: edit.kind, width: params.width }, title);
+
+    return { ...result, caption: edit.description, kind: edit.kind };
+}
+
+const SIGNERS = { ai: signAi, manual: signManual, publish: signManual, video: signVideo };
+
+export const signEdit = (tool, parent, params, title) => SIGNERS[tool.mode](tool, parent, params, title);

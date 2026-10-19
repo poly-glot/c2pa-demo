@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { Builder } from '@contentauth/c2pa-node';
 import { loadConfig } from '../config/index.mjs';
 import { loadReaderContext } from '../lib/c2pa/context.mjs';
 import { AiEdit, ManualEdit } from '../lib/c2pa/manifest.mjs';
@@ -56,10 +57,10 @@ for (const [kind, label] of [
     [ActionKind.EDITED, 'AI manipulated'],
     [ActionKind.INPAINTING, 'AI manipulated'],
     [ActionKind.OUTPAINTING, 'AI manipulated'],
-    [ActionKind.UPSCALED, 'AI enhanced'],
+    [ActionKind.UPSCALED, 'AI manipulated'],
 ]) {
     test(`AI ${kind} is labelled ${label}`, async () => {
-        const { provenance } = await sign(new AiEdit({ agent, instruction: 'make it orange', kind, region }));
+        const { provenance } = await sign(new AiEdit({ agent, kind, region }));
 
         assert.ok(provenance.isValid);
         assert.equal(actionOf(provenance, kind).kind, label);
@@ -88,7 +89,7 @@ test('a placed edit without the placed image is rejected', async () => {
 
 test('unknown kinds and malformed regions are rejected', () => {
     assert.throws(() => new ManualEdit({ agent, description: '', kind: 'c2pa.bogus' }), RangeError);
-    assert.throws(() => new AiEdit({ agent, instruction: '', kind: ActionKind.CROPPED }), RangeError);
+    assert.throws(() => new AiEdit({ agent, kind: ActionKind.CROPPED }), RangeError);
     for (const malformed of [{ x: 1 }, { ...region, width: 0 }, { ...region, x: -1 }]) {
         assert.throws(
             () => new ManualEdit({ agent, description: '', kind: ActionKind.CROPPED, region: malformed }),
@@ -104,10 +105,58 @@ test('data URIs that are not base64 JPEG, PNG or WebP are rejected', () => {
     }
 });
 
-test('Provenance.of embeds the claim thumbnail of every manifest as a data URI', async () => {
-    const provenance = await Provenance.of(original, signing.context);
-    const { identifier } = provenance.store.manifests[provenance.manifestId].thumbnail;
+const IPTC_SOURCE = 'http://cv.iptc.org/newscodes/digitalsourcetype/';
 
-    assert.match(provenance.thumbnails[identifier], /^data:image\/jpeg;base64,/);
-    assert.equal(provenance.toJSON().thumbnails, provenance.thumbnails);
+async function signedFixture({ actionSourceType, iptcSourceType }) {
+    const builder = await Builder.withJsonAsync(
+        { claim_generator_info: [{ name: 'fixture', version: '1' }], title: 'fixture.jpg' },
+        signing.context,
+    );
+    builder.addAssertion('c2pa.actions.v2', {
+        actions: [{ action: ActionKind.CREATED, digitalSourceType: `${IPTC_SOURCE}${actionSourceType}` }],
+    });
+    if (iptcSourceType) {
+        builder.addAssertion('stds.iptc', { 'Iptc4xmpExt:DigitalSourceType': `${IPTC_SOURCE}${iptcSourceType}` });
+    }
+
+    const output = { buffer: null };
+    builder.sign(signing.signer, { buffer: photo.buffer, mimeType: photo.mimeType }, output);
+
+    return Provenance.of({ buffer: output.buffer, mimeType: photo.mimeType }, signing.context);
+}
+
+test('toJSON ships no thumbnails', async () => {
+    const provenance = await Provenance.of(original, signing.context);
+
+    assert.equal('thumbnails' in provenance.toJSON(), false);
+});
+
+test('an action declaring compositeSynthetic is AI edited', async () => {
+    const provenance = await signedFixture({ actionSourceType: 'compositeSynthetic' });
+
+    assert.equal(provenance.aiDeclaration, 'AI edited');
+    assert.equal(provenance.toJSON().aiDeclaration, 'AI edited');
+    assert.equal(provenance.actions[0].kind, 'AI manipulated');
+});
+
+test('an stds.iptc trainedAlgorithmicMedia declaration is AI generated even when the action says digitalCreation', async () => {
+    const provenance = await signedFixture({
+        actionSourceType: 'digitalCreation',
+        iptcSourceType: 'trainedAlgorithmicMedia',
+    });
+
+    assert.equal(provenance.actions[0].kind, 'not AI');
+    assert.equal(provenance.aiDeclaration, 'AI generated');
+});
+
+test('a non-AI signed file has no AI declaration', async () => {
+    const provenance = await signedFixture({ actionSourceType: 'digitalCreation' });
+
+    assert.equal(provenance.aiDeclaration, null);
+});
+
+test('the AI-generated sample declares AI generated', async () => {
+    const provenance = await Provenance.of(original, signing.context);
+
+    assert.equal(provenance.aiDeclaration, 'AI generated');
 });

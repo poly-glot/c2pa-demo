@@ -1,3 +1,4 @@
+import { isVideo } from '../dom.mjs';
 import { polyline, stageMarkup } from './canvas-markup.mjs';
 
 const MIN_SELECTION = 8;
@@ -87,6 +88,13 @@ export function mountStage(stage, canCapture) {
             selection = null;
             strokes = [];
             stage.innerHTML = stageMarkup(layer);
+            if (isVideo(layer.image)) {
+                image().addEventListener('loadedmetadata', ({ target }) =>
+                    onLoaded({ height: target.videoHeight, width: target.videoWidth }),
+                );
+                return;
+            }
+
             image().addEventListener('load', ({ target }) => {
                 size = { height: target.naturalHeight, width: target.naturalWidth };
                 stage.querySelector('.preview__overlay').setAttribute('viewBox', `0 0 ${size.width} ${size.height}`);

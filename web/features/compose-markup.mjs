@@ -24,7 +24,7 @@ const textField = (name, value) => `
 export const slotForm = ({ placeholders, slots, texts }, adjustments) => `
     ${slots.map((slot) => slotField(slot, adjustments)).join('')}
     ${texts.map((name) => textField(name, placeholders.get(name))).join('')}
-    <button class="is-primary" type="submit">Render and sign</button>
+    <button class="is-primary" type="submit">Render</button>
     <span class="compose__status" aria-live="polite"></span>`;
 
 export const shell = (templates) => `

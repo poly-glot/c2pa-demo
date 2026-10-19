@@ -134,8 +134,8 @@ export const TOOLS = [
     }),
     manual({
         apply: (image, { overlay, selection }) => place(image, overlay, selection),
-        edit: ({ layer, selection }) => ({
-            description: `Placed ${layer.title} at ${selection.x},${selection.y} ${selection.width}×${selection.height}`,
+        edit: ({ selection }) => ({
+            description: `Placed an image at ${selection.x},${selection.y} ${selection.width}×${selection.height}`,
             kind: ACTION.placed,
             placed: { slot: 'overlay' },
             region: selection,
@@ -209,4 +209,21 @@ export const TOOLS = [
     }),
 ];
 
-export const TOOL_BY_ID = new Map(TOOLS.map((tool) => [tool.id, tool]));
+export const VIDEO_TOOLS = [
+    {
+        edit: () => ({ description: 'Transcoded the video to H.264', kind: ACTION.transcoded }),
+        id: 'transcodeVideo',
+        label: 'Transcode video',
+        mode: 'video',
+        needs: [],
+    },
+    {
+        edit: ({ width }) => ({ description: `Resized the video to ${width}px wide`, kind: ACTION.resized }),
+        id: 'resizeVideo',
+        label: 'Resize video',
+        mode: 'video',
+        needs: ['width'],
+    },
+];
+
+export const TOOL_BY_ID = new Map([...TOOLS, ...VIDEO_TOOLS].map((tool) => [tool.id, tool]));

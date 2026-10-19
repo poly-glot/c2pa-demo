@@ -1,4 +1,4 @@
-import { download, loadImage } from '../dom.mjs';
+import { download, isVideo, loadImage } from '../dom.mjs';
 import { SLIDER_LABELS, TOOL_BY_ID } from '../edits/registry.mjs';
 import { refillLayerSelect } from './layer-select.mjs';
 import { missingInput, nextTitle, signEdit } from './edit-signing.mjs';
@@ -19,7 +19,7 @@ async function readParams(root, store, canvas, tool) {
         selection: canvas.selection(),
         sliders: Object.fromEntries(Object.keys(SLIDER_LABELS).map((name) => [name, number(name)])),
         strokes: canvas.strokes(),
-        width: number('width'),
+        width: number(tool.mode === 'video' ? 'videoWidth' : 'width'),
     };
 }
 
@@ -50,7 +50,7 @@ export function mountToolbar(root, store, canvas) {
             const { caption, image, kind, provenance } = await signEdit(tool, parent, params, title);
             store.addLayer({ ...image, caption, provenance }, tool.label);
             if (tool.mode === 'publish') download(store.selectedLayer);
-            note.innerHTML = lastEditNote(caption, kind);
+            note.innerHTML = lastEditNote(caption, kind, Boolean(provenance));
         } catch (error) {
             note.textContent = error.message;
         } finally {
@@ -63,8 +63,12 @@ export function mountToolbar(root, store, canvas) {
     store.subscribe(async ({ selectedLayer, sources }) => {
         refillLayerSelect(root.querySelector('[name="layer"]'), sources);
 
+        const video = Boolean(selectedLayer) && isVideo(selectedLayer.image);
+        root.querySelector('[data-video-tools]').hidden = !video;
+        root.querySelectorAll('[data-image-tools]').forEach((section) => (section.hidden = video));
+
         const width = root.querySelector('[name="width"]');
-        if (!selectedLayer || widthFor === selectedLayer) return;
+        if (!selectedLayer || video || widthFor === selectedLayer) return;
 
         widthFor = selectedLayer;
         width.value = (await loadImage(selectedLayer.image)).naturalWidth;

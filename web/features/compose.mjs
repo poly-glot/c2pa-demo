@@ -34,7 +34,7 @@ async function signComposition(store, { images, picked, template, templateName, 
     const components = picked.map(([slot, layer]) => componentFor(slot, layer, toolOf(slot)));
     const rendered = await rasterize(templateToSvg(template, images, text), template);
     const title = composeTitle(templateName, store.sources.length + 1);
-    const { image, provenance } = await api.templateEdit(components, rendered, Object.fromEntries(text), title);
+    const { image, provenance } = await api.templateEdit(components, rendered, title);
     store.addSource(image.title, { ...image, caption: `Template ${templateName}`, provenance });
 }
 

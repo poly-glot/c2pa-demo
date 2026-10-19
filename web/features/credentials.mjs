@@ -8,14 +8,11 @@ import { provenanceView, selectedNode } from './provenance-markup.mjs';
 const imagesByTitle = (sources) =>
     new Map(sources.flatMap((source) => source.layers.map((layer) => [layer.title, layer.image])));
 
-const thumbnailSource = (provenance, imageByTitle) => (node) =>
-    provenance.thumbnails?.[node.thumbnail] ?? imageByTitle.get(node.title) ?? null;
-
 function body(tab, provenance, sources, fresh) {
     if (tab === 'raw') return raw(provenance);
 
     const imageByTitle = imagesByTitle(sources);
-    if (tab === 'provenance') return provenanceView(provenance, thumbnailSource(provenance, imageByTitle));
+    if (tab === 'provenance') return provenanceView(provenance, imageByTitle);
 
     return summary(provenance, { fresh, imageByTitle });
 }
@@ -38,8 +35,11 @@ function selectNode(root, store, path) {
     );
 
     const { provenance } = store.selectedLayer;
-    const srcOf = thumbnailSource(provenance, imagesByTitle(store.sources));
-    root.querySelector('[data-node-detail]').innerHTML = selectedNode(provenanceGraph(provenance.store), path, srcOf);
+    root.querySelector('[data-node-detail]').innerHTML = selectedNode(
+        provenanceGraph(provenance.store),
+        path,
+        imagesByTitle(store.sources),
+    );
 }
 
 const COPIED_FOR_MS = 1500;

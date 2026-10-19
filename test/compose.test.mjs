@@ -35,7 +35,6 @@ for (const [name, left, right, expected, aiCount] of [
     ['AI left, photo right', ai, photo, DigitalSourceType.AI_MANIPULATED, 2],
     ['photo left, AI right', photo, ai, DigitalSourceType.AI_MANIPULATED, 2],
     ['AI both', ai, ai, DigitalSourceType.AI_MANIPULATED, 2],
-    ['photo both', photo, photo, DigitalSourceType.COMPOSITE, 0],
 ]) {
     test(`composite of ${name}`, async () => {
         const { provenance } = await compose(left, right);
@@ -52,7 +51,7 @@ for (const [name, left, right, expected, aiCount] of [
     });
 }
 
-test('composite records per-slot edits after their placement and the template text', async () => {
+test('composite records per-slot edits after their placement and no text', async () => {
     const crop = new ManualEdit({
         agent: services.agent,
         description: 'Cropped to the slot',
@@ -60,11 +59,10 @@ test('composite records per-slot edits after their placement and the template te
     });
     const { provenance } = await composeWithProvenance(services, {
         components: [
-            { asset: photo, edits: [crop], slot: 'left' },
+            { asset: ai, edits: [crop], slot: 'left' },
             { asset: photo, slot: 'right' },
         ],
         rendered,
-        text: { headline: 'Fresh' },
     });
 
     assert.ok(provenance.isValid);
@@ -73,9 +71,17 @@ test('composite records per-slot edits after their placement and the template te
         provenance.actions.map((action) => action.action),
         [ActionKind.CREATED, ActionKind.PLACED, ActionKind.CROPPED, ActionKind.PLACED],
     );
-    assert.equal(provenance.actions[0].description, 'headline: Fresh');
+    assert.equal(provenance.actions[0].description, null);
+    assert.equal(JSON.stringify(provenance.store).includes('Fresh'), false);
     assert.deepEqual(
         provenance.components.map((component) => component.slot),
         ['left', 'right'],
     );
+});
+
+test('composite of photo both comes back unsigned', async () => {
+    const { image, provenance } = await compose(photo, photo);
+
+    assert.equal(provenance, null);
+    assert.deepEqual(image.buffer, rendered.buffer);
 });

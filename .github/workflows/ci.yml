@@ -16,6 +16,12 @@ jobs:
                   node-version: '22'
                   cache: npm
 
+            - uses: dtolnay/rust-toolchain@stable
+
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: cli
+
             - run: npm ci
 
             - name: Generate a throwaway signing certificate

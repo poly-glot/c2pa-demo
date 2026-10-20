@@ -9,3 +9,4 @@ assets/
 .idea/
 .zvec-grep/
 .impeccable/
+cli/target/

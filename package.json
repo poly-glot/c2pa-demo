@@ -5,19 +5,19 @@
     "type": "module",
     "scripts": {
         "certs": "sh cert/generate.sh",
-        "check": "npm run lint && npm run prettier:check && npm test && npm run selfcheck -- ./samples/NOVA-SPK-500ML_Hero_Studio_2400x2400_AI-Generated_DAT-Create.jpg ./assets/selfcheck.jpg",
+        "check": "npm run lint && npm run prettier:check && npm run cli:test && npm test && npm run selfcheck -- ./samples/NOVA-SPK-500ML_Hero_Studio_2400x2400_AI-Generated_DAT-Create.jpg ./assets/selfcheck.jpg",
+        "cli:build": "cargo build --release --manifest-path cli/Cargo.toml",
+        "cli:test": "cargo test --manifest-path cli/Cargo.toml",
         "lint": "eslint .",
         "prettier": "prettier --write .",
-        "reference-clip": "node --env-file-if-exists=.env scripts/reference-clip.mjs",
         "prettier:check": "prettier --check .",
+        "provenance": "cargo run --release --quiet --manifest-path cli/Cargo.toml --",
+        "reference-clip": "node --env-file-if-exists=.env scripts/reference-clip.mjs",
         "selfcheck": "SELFCHECK=1 node --env-file-if-exists=.env main.mjs",
         "serve": "node --env-file-if-exists=.env server.mjs",
         "start": "node --env-file-if-exists=.env main.mjs",
-        "test": "node --test",
+        "test": "npm run cli:build && node --test",
         "trust": "for f in anchors.pem allowed.sha256.txt store.cfg; do curl -sSL -o cert/trust/$f https://contentcredentials.org/trust/$f; done"
-    },
-    "dependencies": {
-        "@contentauth/c2pa-node": "^0.9.9"
     },
     "devDependencies": {
         "@eslint/js": "^9.39.0",

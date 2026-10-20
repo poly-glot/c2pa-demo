@@ -1,16 +1,12 @@
+import { execFile } from 'node:child_process';
 import { createServer } from 'node:http';
-import { readdir, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { loadConfig } from './config/index.mjs';
 import { createAccess } from './lib/http/access.mjs';
-import { AiEdit, ManualEdit } from './lib/c2pa/manifest.mjs';
-import { Provenance } from './lib/c2pa/provenance.mjs';
-import { loadReaderContext } from './lib/c2pa/context.mjs';
-import { loadLocalSigner } from './lib/c2pa/signer.mjs';
-import { composeWithProvenance } from './lib/compose.mjs';
-import { createWithProvenance } from './lib/create.mjs';
-import { deriveWithProvenance } from './lib/derive.mjs';
 import { ImageAsset, mimeTypeOf } from './lib/image-asset.mjs';
 import { GatewayImageEditor } from './lib/image-editors.mjs';
 import { describeVideoEdit, reencode, VIDEO_KINDS } from './lib/video.mjs';
@@ -23,23 +19,61 @@ const STATIC_TYPES = new Map([
     ['.html', 'text/html; charset=utf-8'],
     ['.mjs', 'text/javascript'],
 ]);
-const MANUAL_AGENT = { name: 'Browser canvas editor' };
-const TEMPLATE_AGENT = { name: 'Browser template renderer' };
-const VIDEO_AGENT = { name: 'ffmpeg' };
+const MANUAL_AGENT = 'Browser canvas editor';
+const TEMPLATE_AGENT = 'Browser template renderer';
+const VIDEO_AGENT = 'ffmpeg';
+const AI_EDIT = 'c2pa.edited';
+const INVALID_INPUT_EXIT = 2;
+const MAX_OUTPUT = 256 * 1024 * 1024;
 const isTemplate = (name) => extname(name) === '.html';
 
 const config = loadConfig();
-const signing = {
-    claimGenerator: config.claimGenerator,
-    context: await loadReaderContext(config.trust),
-    signer: await loadLocalSigner(config.signing),
-};
 const editor = new GatewayImageEditor(config.gateway);
 const access = createAccess(config.access);
+const run = promisify(execFile);
 
 const assetOf = (source) => ImageAsset.fromDataUri(source?.image, source?.title);
-const manualEdit = ({ description, kind, region }) =>
-    new ManualEdit({ agent: MANUAL_AGENT, description, kind, region });
+const flag = (name, value) => (value == null ? [] : [name, String(value)]);
+const regionFlag = (region) => flag('--region', region && `${region.x},${region.y},${region.width},${region.height}`);
+
+async function provenance(args) {
+    try {
+        const { stdout } = await run(config.provenanceBinary, [...args, '--json'], { maxBuffer: MAX_OUTPUT });
+        return JSON.parse(stdout);
+    } catch (error) {
+        const message =
+            error.stderr
+                ?.toString()
+                .replace(/^provenance: /, '')
+                .trim() || error.message;
+        throw new (error.code === INVALID_INPUT_EXIT ? RangeError : Error)(message);
+    }
+}
+
+async function stage(directory, asset, index) {
+    const folder = join(directory, String(index));
+    await mkdir(folder);
+
+    const path = join(folder, asset.title);
+    await writeFile(path, asset.buffer);
+    return path;
+}
+
+async function withFiles(assets, task) {
+    const directory = await mkdtemp(join(tmpdir(), 'provenance-'));
+    try {
+        const paths = await Promise.all(assets.map((asset, index) => stage(directory, asset, index)));
+        return await task(paths, join(directory, 'output'));
+    } finally {
+        await rm(directory, { force: true, recursive: true });
+    }
+}
+
+const sign = (result, assets, args) =>
+    withFiles(assets, async (paths, output) => {
+        const report = await provenance([...args(...paths), '-o', output]);
+        return { image: result.withBuffer(await readFile(output)), provenance: report };
+    });
 
 const api = {
     'GET /api/samples': async () => (await readdir(SAMPLES_DIR)).filter(mimeTypeOf).sort(),
@@ -48,51 +82,72 @@ const api = {
         if (typeof prompt !== 'string' || !prompt.trim()) throw new RangeError('expected a non-empty prompt');
 
         const generated = (await editor.generate(prompt, title)).retitledAs(title);
-        return createWithProvenance(signing, { agent: editor.agent, generated });
+        return sign(generated, [generated], (input) => ['create', input, '--agent', editor.agent]);
     },
-    'POST /api/edits/ai': async ({ input, instruction, kind, parent, region, title }) => {
-        const edit = new AiEdit({ agent: editor.agent, kind, region });
+    'POST /api/edits/ai': async ({ input, instruction, kind = AI_EDIT, parent, region, title }) => {
         const original = assetOf(parent);
-        const edited = (
-            await editor.edit(input ? assetOf({ image: input, title: parent.title }) : original, instruction)
-        ).retitledAs(title);
-        return deriveWithProvenance(signing, { edit, edited, original });
+        const source = input ? assetOf({ image: input, title: parent.title }) : original;
+        const edited = (await editor.edit(source, instruction)).retitledAs(title);
+        return sign(edited, [original, edited], (parentPath, editedPath) => [
+            'edit',
+            parentPath,
+            editedPath,
+            '--ai',
+            '--agent',
+            editor.agent,
+            ...flag('--action', kind),
+            ...regionFlag(region),
+        ]);
     },
-    'POST /api/edits/manual': ({ edited, parent, placed, title, ...edit }) =>
-        deriveWithProvenance(signing, {
-            edit: manualEdit(edit),
-            edited: ImageAsset.fromDataUri(edited).retitledAs(title),
-            original: assetOf(parent),
-            placed: placed && { asset: assetOf(placed), slot: placed.slot },
-        }),
+    'POST /api/edits/manual': ({ description, edited, kind, parent, placed, region, title }) => {
+        const result = ImageAsset.fromDataUri(edited).retitledAs(title);
+        const assets = [assetOf(parent), result, ...(placed ? [assetOf(placed)] : [])];
+        return sign(result, assets, (parentPath, editedPath, placedPath) => [
+            'edit',
+            parentPath,
+            editedPath,
+            '--agent',
+            MANUAL_AGENT,
+            ...flag('--action', kind),
+            ...flag('--description', description),
+            ...regionFlag(region),
+            ...flag('--placed', placedPath && `${placed.slot}=${placedPath}`),
+        ]);
+    },
     'POST /api/edits/template': ({ components, rendered, title }) => {
         if (!Array.isArray(components)) throw new RangeError('expected a list of components');
 
-        return composeWithProvenance(
-            { ...signing, agent: TEMPLATE_AGENT },
-            {
-                components: components.map(({ edits = [], slot, ...component }) => ({
-                    asset: assetOf(component),
-                    edits: edits.map(manualEdit),
-                    slot,
-                })),
-                rendered: ImageAsset.fromDataUri(rendered).retitledAs(title),
-            },
-        );
+        const result = ImageAsset.fromDataUri(rendered).retitledAs(title);
+        return sign(result, [result, ...components.map(assetOf)], (renderedPath, ...componentPaths) => [
+            'compose',
+            renderedPath,
+            '--agent',
+            TEMPLATE_AGENT,
+            ...components.flatMap(({ edits = [], slot }, index) => [
+                '--component',
+                `${slot}=${componentPaths[index]}`,
+                ...edits.flatMap(({ description, kind: action }) => ['--edit', `${slot}=${action}=${description}`]),
+            ]),
+        ]);
     },
     'POST /api/edits/video': async ({ kind, parent, title, width }) => {
         if (!VIDEO_KINDS.has(kind)) throw new RangeError(`unsupported video edit: ${kind}`);
 
         const original = assetOf(parent);
         const edited = (await reencode(original, { kind, width })).retitledAs(title);
-        const description = describeVideoEdit({ kind, width });
-        return deriveWithProvenance(signing, {
-            edit: new ManualEdit({ agent: VIDEO_AGENT, description, kind }),
-            edited,
-            original,
-        });
+        return sign(edited, [original, edited], (parentPath, editedPath) => [
+            'edit',
+            parentPath,
+            editedPath,
+            '--agent',
+            VIDEO_AGENT,
+            '--action',
+            kind,
+            '--description',
+            describeVideoEdit({ kind, width }),
+        ]);
     },
-    'POST /api/provenance': (image) => Provenance.of(assetOf(image), signing.context),
+    'POST /api/provenance': (image) => withFiles([assetOf(image)], ([path]) => provenance(['inspect', path])),
 };
 
 const CLIENT_ERRORS = [RangeError, SyntaxError, URIError];

@@ -9,6 +9,7 @@ was made from.
 ## Requirements
 
 - Node.js 22.9 or later (the scripts use `--env-file-if-exists`)
+- A Rust toolchain (`cargo`), to build the provenance CLI in `cli/`
 - OpenSSL, only if you want to generate your own test certificate
 - FFmpeg on the `PATH`, only for the video tools and `npm run reference-clip`
 - An API key for the LLM gateway, only for real AI edits (the self-check runs without one)
@@ -17,24 +18,32 @@ was made from.
 
 ```sh
 npm install
+npm run certs
+npm run cli:build
 cp .env.example .env
 ```
 
+`npm run cli:build` compiles `cli/` into `cli/target/release/provenance`, the binary that does all signing and
+reading. The certificate chain, the private key and the trust lists under `cert/` are embedded into it at build time,
+so rebuild after `npm run certs` (`npm test` does this for you).
+
 Fill in `.env`:
 
-| Variable            | Purpose                                                                      | Default                                      |
-| ------------------- | ---------------------------------------------------------------------------- | -------------------------------------------- |
-| `APP_PASSWORD`      | Password every request must carry; unset leaves the demo open                | unset, open                                  |
-| `LLM_API_KEY`       | Bearer token for the gateway                                                 | none, required for real edits                |
-| `LLM_GATEWAY_URL`   | OpenAI-compatible chat completions endpoint                                  | none, required for real edits                |
-| `LLM_IMAGE_MODEL`   | Image model to request                                                       | `gemini-3.1-flash-image`                     |
-| `PORT`              | Port the browser demo listens on                                             | `8787`                                       |
-| `C2PA_CERT`         | PEM certificate chain used to sign manifests                                 | `cert/claim-signer.pem`                      |
-| `C2PA_KEY`          | PEM private key (ES256) for that certificate                                 | `cert/claim-signer.key`                      |
-| `C2PA_KEY_PEM`      | The same key as PEM text, for a Secret Manager env var; wins over `C2PA_KEY` | unset                                        |
-| `C2PA_TSA`          | Timestamp authority URL, optional                                            | none                                         |
-| `C2PA_USER_ANCHORS` | Comma-separated PEM files of extra CA certificates to trust                  | `cert/root-ca.pem` and the test intermediate |
-| `SELFCHECK`         | Set to `1` to skip the model and copy the image through unchanged            | unset                                        |
+| Variable          | Purpose                                                                  | Default                               |
+| ----------------- | ------------------------------------------------------------------------ | ------------------------------------- |
+| `APP_PASSWORD`    | Password every request must carry; unset leaves the demo open            | unset, open                           |
+| `LLM_API_KEY`     | Bearer token for the gateway                                             | none, required for real edits         |
+| `LLM_GATEWAY_URL` | OpenAI-compatible chat completions endpoint                              | none, required for real edits         |
+| `LLM_IMAGE_MODEL` | Image model to request                                                   | `gemini-3.1-flash-image`              |
+| `PORT`            | Port the browser demo listens on                                         | `8787`                                |
+| `PROVENANCE_BIN`  | Path of the provenance CLI binary                                        | `cli/target/release/provenance`       |
+| `C2PA_CERT`       | PEM certificate chain the CLI signs with; overrides the embedded chain   | embedded from `cert/claim-signer.pem` |
+| `C2PA_KEY`        | PEM private key (ES256) for that certificate; overrides the embedded key | embedded from `cert/claim-signer.key` |
+| `C2PA_KEY_PEM`    | The same key as PEM text, for a Secret Manager env var                   | unset                                 |
+| `C2PA_TSA`        | Timestamp authority URL, optional                                        | none                                  |
+| `SELFCHECK`       | Set to `1` to skip the model and copy the image through unchanged        | unset                                 |
+
+The `C2PA_*` variables are read by the CLI itself; the Node processes only pass their environment through.
 
 ### Trust list
 
@@ -44,9 +53,9 @@ The reader validates signers against the official C2PA trust list published by t
 npm run trust
 ```
 
-A signer whose chain ends at one of those anchors shows as trusted. Anything else shows as untrusted, however well formed its certificate is. To trust additional signers of your own choosing, set `C2PA_USER_ANCHORS` to a comma-separated list of PEM files holding CA certificates. The default trusts `cert/root-ca.pem`, so manifests this project signs show as trusted, and `cert/trust/test-intermediate-ca.pem`, the intermediate CA that signed the previous NOVA sample. The NOVA sample is now signed by the project's own test chain, so that intermediate is kept only until it is retired.
+A signer whose chain ends at one of those anchors shows as trusted (`signerTrust: "c2pa"`). The CLI also embeds a second, user anchor list: `cert/root-ca.pem`, so manifests this project signs show as trusted (`signerTrust: "user"`), and `cert/trust/test-intermediate-ca.pem`, the intermediate CA that signed the previous NOVA sample. The NOVA sample is now signed by the project's own test chain, so that intermediate is kept only until it is retired. Anything else shows as untrusted, however well formed its certificate is. All of these files are compiled into the binary, so changing them means `npm run cli:build`.
 
-Open item: the Confluence test root from Scenario 6 is not yet trusted. When its PEM is available, add it to `C2PA_USER_ANCHORS` and to the default list in `config/index.mjs`, so the Scenario 6 assets verify as trusted.
+Open item: the Confluence test root from Scenario 6 is not yet trusted. When its PEM is available, add it to the user anchors in `cli/src/credentials.rs`, so the Scenario 6 assets verify as trusted.
 
 ### Signing certificate
 
@@ -59,8 +68,10 @@ The private keys are not committed. Generate a fresh test pair with:
 npm run certs
 ```
 
-This writes `cert/root-ca.key`, `cert/root-ca.pem`, `cert/claim-signer.key` and `cert/claim-signer.pem`. For production,
-point `C2PA_CERT` and `C2PA_KEY` at a certificate issued by a CA on the C2PA trust list.
+This writes `cert/root-ca.key`, `cert/root-ca.pem`, `cert/claim-signer.key` and `cert/claim-signer.pem`. The CLI embeds
+the chain and the key when it is built; a build without `cert/claim-signer.key` (the Docker image, for one) produces a
+binary that needs `--key` or `C2PA_KEY_PEM` to sign. For production, point `C2PA_CERT` and `C2PA_KEY` (or
+`C2PA_KEY_PEM`) at a certificate issued by a CA on the C2PA trust list.
 
 ## Usage
 
@@ -114,6 +125,42 @@ npm run selfcheck -- <input image> <output image>
 ```
 
 `npm run check` runs ESLint, Prettier, the unit tests and the self-check against the sample asset in one go.
+
+## Provenance CLI
+
+`cli/` is a Rust binary built on the official [`c2pa`](https://crates.io/crates/c2pa) crate (c2pa-rs). Every C2PA
+operation in this project goes through it: manifest building, signing, reading, the AI scope rule and trust decisions.
+The JavaScript never touches a C2PA library: `server.mjs` writes the request's images to a temporary directory, runs the
+binary with plain arguments and `--json`, and returns its report; `main.mjs` and `scripts/reference-clip.mjs` run it on
+files directly.
+
+```sh
+npm run provenance -- create <image> [-o <output>] [--agent <name>]
+npm run provenance -- edit <original> <edited> [--ai] [--action <c2pa.action>] [--description <text>]
+                             [--region <x,y,width,height>] [--placed <slot>=<image>] [-o <output>] [--agent <name>]
+npm run provenance -- compose <rendered> --component <slot>=<image>... [--edit <slot>=<action>=<description>]...
+                             [-o <output>] [--agent <name>]
+npm run provenance -- inspect <image>
+```
+
+- `create` signs an AI-generated image or video (`c2pa.created`, `trainedAlgorithmicMedia`).
+- `edit` signs `edited` as derived from `original`: the original's manifests are carried in the new store, the original
+  is the `parentOf` ingredient and the action (default `c2pa.edited`) carries the description and region. `--ai` marks
+  the action `compositeWithTrainedAlgorithmicMedia` and always signs; without it the edit is manual and is signed only
+  when the original or the `--placed` image already declares AI, otherwise the output is an unsigned copy.
+- `compose` signs a render as a composite (`c2pa.created`, `compositeWithTrainedAlgorithmicMedia`): each component is a
+  `componentOf` ingredient with a `c2pa.placed` action, followed by its `--edit` adjustments. It is signed only when a
+  component declares AI, otherwise the output is an unsigned copy.
+- `inspect` prints the signer, actions and parent, and exits 1 when the manifest does not validate.
+
+`--json` on any command prints the full report instead (`actions`, `timeline`, `parent`, `components`, `aiDeclaration`,
+`signerTrust`, `isValid`, `failures`, the raw `store`, …), or `null` when the output was left unsigned or the inspected
+file carries no manifest. Bad input (an unknown action, an AI edit of a manual kind, a bad region, a placed edit without
+`--placed`, an `--edit` for a slot no component fills) exits 2; the server turns that into a 400.
+
+Every command accepts `--cert`, `--key` and `--tsa`, also read from `C2PA_CERT`, `C2PA_KEY` and `C2PA_TSA`; `C2PA_KEY_PEM`
+supplies the key as text. Signed copies default to `<name>.signed.<ext>` beside the input. `npm run cli:test` runs the
+Rust tests.
 
 ## Browser demo
 
@@ -287,7 +334,7 @@ The browser talks to these routes. Each request and response body is JSON. Image
 
 Errors return `{ "error": "message" }`. A `RangeError`, `SyntaxError` or `URIError` (for example a bad region, an unsupported action or a malformed file name) gives status 400, and anything else gives 500.
 
-`/api/provenance` returns `Provenance.toJSON()`, with these keys:
+`/api/provenance` returns the CLI's `inspect --json` report, with these keys:
 
 | Key                | Contents                                                                                |
 | ------------------ | --------------------------------------------------------------------------------------- |
@@ -335,17 +382,10 @@ The repository secrets `WIF_PROVIDER` and `GCP_SA_EMAIL` come from the Terraform
 
 ### With this project
 
-The script verifies its own output before exiting. To inspect any signed image in more detail, use the reader from the
-library:
+The script verifies its own output before exiting. To inspect any signed image in more detail, use the CLI:
 
 ```sh
-node -e "
-import('@contentauth/c2pa-node').then(async ({ Reader }) => {
-  const { readFileSync } = await import('node:fs');
-  const reader = await Reader.fromAsset({ buffer: readFileSync(process.argv[1]), mimeType: 'image/jpeg' });
-  console.log(JSON.stringify(reader.json(), null, 2));
-});
-" ./assets/NOVA-SPK-500ML_Hero_Studio_orange.jpg
+npm run provenance -- inspect ./assets/NOVA-SPK-500ML_Hero_Studio_orange.jpg --json | jq .store
 ```
 
 Look for `validation_state: "Valid"`, the `c2pa.actions` assertion on the active manifest, and an ingredient with
@@ -382,22 +422,22 @@ package-lock.json             locked dependency versions
 main.mjs                      command-line entry point
 server.mjs                    HTTP server for the browser demo: static files and a JSON API
 config/index.mjs              reads .env and supplies defaults
-lib/compose.mjs               signs a template render with its placed images as ingredients, unsigned unless one is AI-declared
-lib/create.mjs                signs a generated image as the first manifest of a new asset
-lib/derive.mjs                signs an edited image against its parent and reads the result back, or returns it unsigned under the AI scope rule
 lib/image-asset.mjs           immutable image value: bytes, MIME type, title
 lib/image-editors.mjs         GatewayImageEditor (calls the model) and IdentityImageEditor (self-check)
 lib/video.mjs                 ffmpeg transcode and resize for MP4 files
 lib/http/access.mjs           password gate: session cookie, password header, login and logout
-lib/c2pa/context.mjs         reader context: trust anchors, allowed list, user anchors and the builder setting that turns thumbnails off
-lib/c2pa/manifest.mjs         AiEdit, ManualEdit, DerivedManifest, CompositeManifest and GeneratedManifest builders
-lib/c2pa/provenance.mjs       reads a signed image back and summarises its chain
-lib/c2pa/signer.mjs          loads the certificate and key into a local signer
-lib/c2pa/vocabulary.mjs      C2PA and IPTC constants: action kinds, digital source types, relationships
+cli/Cargo.toml                the provenance CLI crate, built on the official c2pa crate
+cli/build.rs                  embeds cert/claim-signer.key when it exists at build time
+cli/src/main.rs               commands: create, edit, compose, inspect; --json, --cert, --key, --tsa
+cli/src/credentials.rs        embedded chain, key and trust lists; the signing and reader contexts
+cli/src/manifest.rs           generated, derived and composite manifests, edit validation, the AI scope rule, signing
+cli/src/report.rs             the provenance report the browser consumes: actions, timeline, parent, AI declaration, trust
+cli/tests/cli.rs              commands end to end and their exit codes
+cli/tests/report.rs           AI declaration rules on signed fixtures
 web/index.html                page shell: masthead, status bar, first run, editor, credentials pane, dialogs
 web/login.html                sign-in page served while the password gate is closed
 web/app.css                   styles for the whole page
-web/actions.mjs               C2PA action labels for the browser, mirrored from lib/c2pa/vocabulary.mjs
+web/actions.mjs               C2PA action labels for the browser, mirrored from cli/src/job.rs
 web/app.mjs                   starts the store and mounts each feature
 web/api.mjs                   client for the JSON API
 web/dom.mjs                   DOM helpers: image loading, data URIs, download, chips, tabs
@@ -435,16 +475,14 @@ templates/three-up.html       three image slots, 1800 × 800
 templates/hero-caption.html   one image slot and two text slots, 1600 × 1000
 templates/social-square.html  one image slot, one logo slot and one text slot, 1080 × 1080
 test/access.test.mjs          password gate: cookies, login, logout
-test/compose.test.mjs         composed manifests, per-slot edits and text
 test/diff.test.mjs            line diff
 test/edit-signing.test.mjs    missing-input hints and version titles
 test/edits.test.mjs           edit registry, canvas operations and AI request scoping
-test/provenance.test.mjs    manifest builders and provenance reading
-test/template.test.mjs      template parsing, slot form, filling and per-slot components
-test/timeline.test.mjs      timeline descriptions, markers and credential statuses
-test/header.test.mjs        status bar chips and file name
-test/signing.test.mjs       signing without thumbnails, AI scope and unsigned outputs
-test/video.test.mjs         video transcode and resize, with the BMFF hard binding
+test/header.test.mjs          status bar chips and file name
+test/image-asset.test.mjs     data URI parsing and titles
+test/template.test.mjs        template parsing, slot form, filling and per-slot components
+test/timeline.test.mjs        timeline descriptions, markers and credential statuses
+test/video.test.mjs           ffmpeg resize keeps an even width, width bounds
 cert/claim-signer.cnf         OpenSSL configuration for the signing certificate
 cert/claim-signer.pem         test signing certificate chain
 cert/generate.sh              makes a fresh test CA and signing pair
@@ -464,4 +502,4 @@ assets/                       output, ignored by git
 ## Supported formats
 
 JPEG, PNG and WebP for stills and MP4 for video, chosen by file extension. The output keeps the MIME type the model returns, so give the output file
-an extension that matches the input. Video is hashed with a box-based hard binding (`c2pa.hash.bmff.v3`), written by the library.
+an extension that matches the input. Video is hashed with a box-based hard binding (`c2pa.hash.bmff.v3`), written by the c2pa crate.

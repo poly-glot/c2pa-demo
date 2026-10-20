@@ -47,31 +47,23 @@ fn invalid(message: impl Into<String>) -> anyhow::Error {
 }
 
 #[derive(Debug, Clone)]
-pub struct Asset {
-    pub path: PathBuf,
-    pub title: String,
-}
+pub struct Asset(PathBuf);
 
 impl Asset {
-    pub fn from_path(path: &Path) -> Result<Self> {
-        let title = path
-            .file_name()
-            .context("the path has no file name")?
-            .to_string_lossy()
-            .into_owned();
-        Ok(Self {
-            path: path.to_path_buf(),
-            title,
-        })
+    pub fn from_path(path: &Path) -> Self {
+        Self(path.to_path_buf())
+    }
+
+    fn title(&self) -> String {
+        self.0.file_name().unwrap_or_default().to_string_lossy().into_owned()
     }
 
     pub fn format(&self) -> Result<String> {
-        c2pa::format_from_path(&self.path)
-            .ok_or_else(|| invalid(format!("unsupported asset type: {}", self.path.display())))
+        c2pa::format_from_path(&self.0).ok_or_else(|| invalid(format!("unsupported asset type: {}", self.0.display())))
     }
 
     pub fn bytes(&self) -> Result<Vec<u8>> {
-        std::fs::read(&self.path).with_context(|| format!("reading {}", self.path.display()))
+        std::fs::read(&self.0).with_context(|| format!("reading {}", self.0.display()))
     }
 
     fn declares_ai(&self, context: &Arc<Context>) -> Result<bool> {
@@ -195,23 +187,18 @@ impl Manifest {
                 }
                 Ok(())
             }
-            Manifest::Composite { components, .. } => {
-                if components.is_empty() {
-                    return Err(invalid("a composite needs at least one component"));
-                }
-                components
-                    .iter()
-                    .flat_map(|component| &component.edits)
-                    .try_for_each(Edit::validate)
-            }
+            Manifest::Composite { components, .. } => components
+                .iter()
+                .flat_map(|component| &component.edits)
+                .try_for_each(Edit::validate),
         }
     }
 
     pub fn sign(&self, asset: &Asset, output: &Path, context: &Arc<Context>) -> Result<Option<Report>> {
         self.validate()?;
         if !self.has_ai_lineage(context)? {
-            if output != asset.path {
-                std::fs::copy(&asset.path, output).with_context(|| format!("writing {}", output.display()))?;
+            if output != asset.0 {
+                std::fs::copy(&asset.0, output).with_context(|| format!("writing {}", output.display()))?;
             }
             return Ok(None);
         }
@@ -219,7 +206,7 @@ impl Manifest {
         let format = asset.format()?;
         let definition = json!({
             "claim_generator_info": [{ "name": CLAIM_GENERATOR, "version": VERSION }],
-            "title": asset.title,
+            "title": asset.title(),
         });
         let mut builder = Builder::from_shared_context(context).with_definition(definition)?;
         self.apply(&mut builder)?;
@@ -241,9 +228,9 @@ impl Manifest {
         let ingredients: Vec<&Asset> = match self {
             Manifest::Generated { .. } => return Ok(true),
             Manifest::Derived { edit, .. } if edit.ai => return Ok(true),
-            Manifest::Derived { parent, placed, .. } => {
-                std::iter::once(parent).chain(placed.iter().map(|placed| &placed.asset)).collect()
-            }
+            Manifest::Derived { parent, placed, .. } => std::iter::once(parent)
+                .chain(placed.iter().map(|placed| &placed.asset))
+                .collect(),
             Manifest::Composite { components, .. } => components.iter().map(|component| &component.asset).collect(),
         };
         for asset in ingredients {
@@ -315,7 +302,7 @@ fn add_ingredient(builder: &mut Builder, asset: &Asset, relationship: &str, slot
         "format": asset.format()?,
         "instance_id": slot,
         "relationship": relationship,
-        "title": asset.title,
+        "title": asset.title(),
     });
     builder.add_ingredient_from_stream(
         ingredient.to_string(),

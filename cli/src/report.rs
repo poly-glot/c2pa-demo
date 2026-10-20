@@ -47,13 +47,6 @@ pub struct RegionView {
 #[serde(rename_all = "camelCase")]
 pub struct IngredientView {
     pub carries_manifest: bool,
-    pub title: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ComponentView {
-    pub carries_manifest: bool,
     pub slot: Option<String>,
     pub title: Option<String>,
 }
@@ -71,7 +64,7 @@ pub struct Report {
     pub ai_actions: Vec<ActionView>,
     pub ai_declaration: Option<String>,
     pub claim_generator: Option<ClaimGenerator>,
-    pub components: Vec<ComponentView>,
+    pub components: Vec<IngredientView>,
     pub failures: Vec<String>,
     pub instance_id: Option<String>,
     pub is_valid: bool,
@@ -225,17 +218,17 @@ fn timeline_of(manifests: &Value, active_id: &str) -> Vec<ActionView> {
 fn describe_ingredient(ingredient: &Value) -> IngredientView {
     IngredientView {
         carries_manifest: !ingredient["manifest_data"].is_null(),
+        slot: None,
         title: text(&ingredient["title"]),
     }
 }
 
-fn components_of(manifest: &Value) -> Vec<ComponentView> {
+fn components_of(manifest: &Value) -> Vec<IngredientView> {
     array(&manifest["ingredients"])
         .filter(|ingredient| ingredient["relationship"] == "componentOf")
-        .map(|ingredient| ComponentView {
-            carries_manifest: !ingredient["manifest_data"].is_null(),
+        .map(|ingredient| IngredientView {
             slot: text(&ingredient["instance_id"]),
-            title: text(&ingredient["title"]),
+            ..describe_ingredient(ingredient)
         })
         .collect()
 }
@@ -315,6 +308,7 @@ fn summarise(signer: &str, actions: &[ActionView], parent: &Option<IngredientVie
         Some(IngredientView {
             carries_manifest: true,
             title,
+            ..
         }) => {
             format!("parent {} with its manifest", title.as_deref().unwrap_or("untitled"))
         }

@@ -18,7 +18,6 @@ const MANUAL_ACTIONS = new Set([
     'c2pa.resized',
     'c2pa.transcoded',
 ]);
-const SIGNER_ACTIONS = new Set([...AI_ACTIONS, ...MANUAL_ACTIONS, 'c2pa.created', 'c2pa.opened']);
 const SELECTION = { height: 40, width: 30, x: 10, y: 20 };
 const PARAMS = {
     layer: { title: 'Logo' },
@@ -62,7 +61,10 @@ test('functions match the mode', () => {
 });
 
 test('the browser action vocabulary mirrors the signer vocabulary', () => {
-    assert.deepEqual(new Set(Object.values(ACTION)), SIGNER_ACTIONS);
+    assert.deepEqual(
+        new Set(Object.values(ACTION)),
+        new Set([...AI_ACTIONS, ...MANUAL_ACTIONS, 'c2pa.created', 'c2pa.opened']),
+    );
 });
 
 test('manual edits return a kind the signer accepts and a region when they need one', () => {

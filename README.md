@@ -347,7 +347,7 @@ Errors return `{ "error": "message" }`. A `RangeError`, `SyntaxError` or `URIErr
 | `instanceId`       | the active manifest's instance identifier, or `null`                                    |
 | `isValid`          | whether the validation state is `Valid` or `Trusted`                                    |
 | `manifestId`       | the active manifest label                                                               |
-| `parent`           | the `parentOf` ingredient as `{ carriesManifest, title }`, or `null`                    |
+| `parent`           | the `parentOf` ingredient as `{ carriesManifest, slot: null, title }`, or `null`        |
 | `parentManifestId` | the parent's manifest label, or `null`                                                  |
 | `signer`           | the certificate's common name and issuer                                                |
 | `signerTrust`      | `c2pa`, `user` or `none`                                                                |

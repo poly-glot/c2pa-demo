@@ -14,11 +14,18 @@ const C2PA_TRUST_CONFIG: &str = include_str!("../../cert/trust/store.cfg");
 const C2PA_TRUST_URI: &str = "https://contentcredentials.org/trust";
 pub const USER_TRUST_URI: &str = "urn:c2pa-demo:test-anchors";
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, clap::Args)]
 pub struct Overrides {
+    /// PEM certificate chain, signing certificate first; overrides the embedded chain
+    #[arg(long, global = true, env = "C2PA_CERT", value_name = "PEM")]
     pub cert: Option<PathBuf>,
+    /// PKCS#8 PEM private key for the signing certificate; overrides the embedded key
+    #[arg(long, global = true, env = "C2PA_KEY", value_name = "PEM")]
     pub key: Option<PathBuf>,
+    #[arg(long, global = true, env = "C2PA_KEY_PEM", hide = true)]
     pub key_pem: Option<String>,
+    /// RFC 3161 timestamp authority URL
+    #[arg(long, global = true, env = "C2PA_TSA", value_name = "URL")]
     pub tsa: Option<String>,
 }
 

@@ -18,7 +18,7 @@ struct Cli {
     #[arg(long, global = true)]
     json: bool,
     #[command(flatten)]
-    signing: SigningOptions,
+    signing: Overrides,
 }
 
 #[derive(Subcommand)]
@@ -83,32 +83,6 @@ struct SignOptions {
     agent: String,
 }
 
-#[derive(Args)]
-struct SigningOptions {
-    /// PEM certificate chain, signing certificate first; overrides the embedded chain
-    #[arg(long, global = true, env = "C2PA_CERT", value_name = "PEM")]
-    cert: Option<PathBuf>,
-    /// PKCS#8 PEM private key for the signing certificate; overrides the embedded key
-    #[arg(long, global = true, env = "C2PA_KEY", value_name = "PEM")]
-    key: Option<PathBuf>,
-    #[arg(long, global = true, env = "C2PA_KEY_PEM", hide = true)]
-    key_pem: Option<String>,
-    /// RFC 3161 timestamp authority URL
-    #[arg(long, global = true, env = "C2PA_TSA", value_name = "URL")]
-    tsa: Option<String>,
-}
-
-impl SigningOptions {
-    fn overrides(&self) -> Overrides {
-        Overrides {
-            cert: self.cert.clone(),
-            key: self.key.clone(),
-            key_pem: self.key_pem.clone(),
-            tsa: self.tsa.clone(),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 struct SlotEdit {
     action: String,
@@ -129,8 +103,7 @@ fn parse_region(value: &str) -> Result<Region, String> {
 
 fn parse_slot_and_path(value: &str) -> Result<(String, Asset), String> {
     let (slot, path) = value.split_once('=').ok_or("expected slot=path")?;
-    let asset = Asset::from_path(Path::new(path)).map_err(|error| error.to_string())?;
-    Ok((slot.to_string(), asset))
+    Ok((slot.to_string(), Asset::from_path(Path::new(path))))
 }
 
 fn parse_placed(value: &str) -> Result<Placed, String> {
@@ -191,7 +164,7 @@ fn run(cli: Cli) -> Result<()> {
             options,
         } => {
             let manifest = Manifest::Derived {
-                parent: Asset::from_path(original)?,
+                parent: Asset::from_path(original),
                 placed: placed.clone(),
                 edit: Edit {
                     action: action.clone(),
@@ -238,20 +211,27 @@ fn with_slot_edits(mut components: Vec<Component>, edits: &[SlotEdit], agent: &s
 
 fn sign(input: &Path, manifest: Manifest, options: &SignOptions, cli: &Cli) -> Result<()> {
     let output = options.output.clone().unwrap_or_else(|| signed_name(input));
-    let context = Arc::new(credentials::signing_context(&cli.signing.overrides())?);
-    let report = manifest.sign(&Asset::from_path(input)?, &output, &context)?;
+    let context = Arc::new(credentials::signing_context(&cli.signing)?);
+    let report = manifest.sign(&Asset::from_path(input), &output, &context)?;
 
     match (&report, cli.json) {
         (_, true) => println!("{}", serde_json::to_string(&report)?),
         (Some(report), false) => println!("{}: {}", output.display(), report.summary),
-        (None, false) => println!("{}: left unsigned, nothing in its lineage declares AI", output.display()),
+        (None, false) => println!(
+            "{}: left unsigned, nothing in its lineage declares AI",
+            output.display()
+        ),
     }
     Ok(())
 }
 
 fn inspect(input: &Path, json: bool) -> Result<()> {
-    let asset = Asset::from_path(input)?;
-    let report = Report::read(&asset.format()?, &asset.bytes()?, &Arc::new(credentials::reader_context()?))?;
+    let asset = Asset::from_path(input);
+    let report = Report::read(
+        &asset.format()?,
+        &asset.bytes()?,
+        &Arc::new(credentials::reader_context()?),
+    )?;
 
     if json {
         println!("{}", serde_json::to_string(&report)?);

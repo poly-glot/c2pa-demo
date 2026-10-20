@@ -22,7 +22,6 @@ const STATIC_TYPES = new Map([
 const MANUAL_AGENT = 'Browser canvas editor';
 const TEMPLATE_AGENT = 'Browser template renderer';
 const VIDEO_AGENT = 'ffmpeg';
-const AI_EDIT = 'c2pa.edited';
 const INVALID_INPUT_EXIT = 2;
 const MAX_OUTPUT = 256 * 1024 * 1024;
 const isTemplate = (name) => extname(name) === '.html';
@@ -41,11 +40,7 @@ async function provenance(args) {
         const { stdout } = await run(config.provenanceBinary, [...args, '--json'], { maxBuffer: MAX_OUTPUT });
         return JSON.parse(stdout);
     } catch (error) {
-        const message =
-            error.stderr
-                ?.toString()
-                .replace(/^provenance: /, '')
-                .trim() || error.message;
+        const message = error.stderr?.toString().trim() || error.message;
         throw new (error.code === INVALID_INPUT_EXIT ? RangeError : Error)(message);
     }
 }
@@ -84,7 +79,7 @@ const api = {
         const generated = (await editor.generate(prompt, title)).retitledAs(title);
         return sign(generated, [generated], (input) => ['create', input, '--agent', editor.agent]);
     },
-    'POST /api/edits/ai': async ({ input, instruction, kind = AI_EDIT, parent, region, title }) => {
+    'POST /api/edits/ai': async ({ input, instruction, kind, parent, region, title }) => {
         const original = assetOf(parent);
         const source = input ? assetOf({ image: input, title: parent.title }) : original;
         const edited = (await editor.edit(source, instruction)).retitledAs(title);

@@ -155,7 +155,10 @@ fn manual_edit_on_an_ai_parent_is_signed_and_links_transcodes_to_the_parent() {
     assert_eq!(crop["kind"], "not AI");
     assert_eq!(crop["description"], "Cropped");
     assert_eq!(crop["region"]["x"], 10.0);
-    assert_eq!(cropped["timeline"].as_array().unwrap().last().unwrap()["kind"], "AI generated");
+    assert_eq!(
+        cropped["timeline"].as_array().unwrap().last().unwrap()["kind"],
+        "AI generated"
+    );
 
     let transcoded = report(&provenance(&[
         "edit",
@@ -172,7 +175,9 @@ fn manual_edit_on_an_ai_parent_is_signed_and_links_transcodes_to_the_parent() {
         .into_iter()
         .find(|action| action["action"] == "c2pa.transcoded")
         .unwrap();
-    assert!(linked["parameters"]["ingredients"].as_array().is_some_and(|links| !links.is_empty()));
+    assert!(linked["parameters"]["ingredients"]
+        .as_array()
+        .is_some_and(|links| !links.is_empty()));
     assert!(transcoded["store"].to_string().contains("c2pa.hash.bmff"));
 }
 
@@ -221,7 +226,17 @@ fn invalid_edits_exit_with_code_two() {
     assert_eq!(exit_code(&placed_without_image), Some(2));
 
     for region in ["1", "10,20,0,40", "-1,20,30,40"] {
-        let bad = provenance(&["edit", AI_IMAGE, PHOTO, "--action", "c2pa.cropped", "--region", region, "-o", &out]);
+        let bad = provenance(&[
+            "edit",
+            AI_IMAGE,
+            PHOTO,
+            "--action",
+            "c2pa.cropped",
+            "--region",
+            region,
+            "-o",
+            &out,
+        ]);
         assert_eq!(exit_code(&bad), Some(2), "region {region}");
     }
 }

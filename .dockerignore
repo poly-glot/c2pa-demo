@@ -12,3 +12,4 @@ hosting
 node_modules
 tasks
 test
+cli/target

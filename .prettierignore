@@ -4,3 +4,4 @@ package-lock.json
 *.png
 .impeccable/
 feedback/
+.codegraph/

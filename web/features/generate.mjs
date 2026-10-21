@@ -7,7 +7,7 @@ export const generateMarkup = () => `
         <p class="hint generate__note" aria-live="polite" data-generate-note></p>
     </form>`;
 
-export const generatedTitle = (date) => {
+const generatedTitle = (date) => {
     const [day, time] = date.toISOString().split('T');
 
     return `AI-Generated_${day.replaceAll('-', '')}-${time.slice(0, 8).replaceAll(':', '')}`;

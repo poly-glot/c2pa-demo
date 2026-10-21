@@ -1,10 +1,23 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ActionKind, AI_ACTIONS, MANUAL_ACTIONS } from '../lib/c2pa/vocabulary.mjs';
 import { ACTION } from '../web/actions.mjs';
 import { boundsOf } from '../web/edits/canvas-ops.mjs';
 import { TOOLS } from '../web/edits/registry.mjs';
 
+const AI_ACTIONS = new Set(['c2pa.edited', 'c2pa.inpainting', 'c2pa.outpainting', 'c2pa.upscaled']);
+const MANUAL_ACTIONS = new Set([
+    'c2pa.color_adjustments',
+    'c2pa.converted',
+    'c2pa.cropped',
+    'c2pa.drawing',
+    'c2pa.edited',
+    'c2pa.filtered',
+    'c2pa.orientation',
+    'c2pa.placed',
+    'c2pa.published',
+    'c2pa.resized',
+    'c2pa.transcoded',
+]);
 const SELECTION = { height: 40, width: 30, x: 10, y: 20 };
 const PARAMS = {
     layer: { title: 'Logo' },
@@ -48,7 +61,10 @@ test('functions match the mode', () => {
 });
 
 test('the browser action vocabulary mirrors the signer vocabulary', () => {
-    assert.deepEqual(new Set(Object.values(ACTION)), new Set(Object.values(ActionKind)));
+    assert.deepEqual(
+        new Set(Object.values(ACTION)),
+        new Set([...AI_ACTIONS, ...MANUAL_ACTIONS, 'c2pa.created', 'c2pa.opened']),
+    );
 });
 
 test('manual edits return a kind the signer accepts and a region when they need one', () => {

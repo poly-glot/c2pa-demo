@@ -4,7 +4,7 @@ import { dirname } from 'node:path';
 import { promisify } from 'node:util';
 import { loadConfig } from './config/index.mjs';
 import { ImageAsset } from './lib/image-asset.mjs';
-import { GatewayImageEditor, IdentityImageEditor } from './lib/image-editors.mjs';
+import { IdentityImageEditor, ZeroGpuImageEditor } from './lib/image-editors.mjs';
 
 const run = promisify(execFile);
 
@@ -16,7 +16,7 @@ function parseArguments([input, output, instruction], config) {
 
 const config = loadConfig();
 const { input, instruction, output } = parseArguments(process.argv.slice(2), config);
-const editor = config.selfCheck ? new IdentityImageEditor() : new GatewayImageEditor(config.gateway);
+const editor = config.selfCheck ? new IdentityImageEditor() : new ZeroGpuImageEditor(config.zeroGpu);
 
 const edited = await editor.edit(await ImageAsset.fromFile(input), instruction);
 await mkdir(dirname(output), { recursive: true });

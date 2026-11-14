@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import { loadConfig } from './config/index.mjs';
 import { createAccess } from './lib/http/access.mjs';
 import { ImageAsset, mimeTypeOf } from './lib/image-asset.mjs';
-import { GatewayImageEditor } from './lib/image-editors.mjs';
+import { ZeroGpuImageEditor } from './lib/image-editors.mjs';
 import { describeVideoEdit, reencode, VIDEO_KINDS } from './lib/video.mjs';
 
 const WEB_DIR = fileURLToPath(new URL('./web/', import.meta.url));
@@ -27,7 +27,7 @@ const MAX_OUTPUT = 256 * 1024 * 1024;
 const isTemplate = (name) => extname(name) === '.html';
 
 const config = loadConfig();
-const editor = new GatewayImageEditor(config.gateway);
+const editor = new ZeroGpuImageEditor(config.zeroGpu);
 const access = createAccess(config.access);
 const run = promisify(execFile);
 
@@ -77,7 +77,7 @@ const api = {
         if (typeof prompt !== 'string' || !prompt.trim()) throw new RangeError('expected a non-empty prompt');
 
         const generated = (await editor.generate(prompt, title)).retitledAs(title);
-        return sign(generated, [generated], (input) => ['create', input, '--agent', editor.agent]);
+        return sign(generated, [generated], (input) => ['create', input, '--agent', editor.creationAgent]);
     },
     'POST /api/edits/ai': async ({ input, instruction, kind, parent, region, title }) => {
         const original = assetOf(parent);

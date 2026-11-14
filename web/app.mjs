@@ -42,12 +42,6 @@ panel('reset').addEventListener('click', async () => {
     location.reload();
 });
 
-panel('logout').hidden = !(await api.session()).required;
-panel('logout').addEventListener('click', async () => {
-    await api.logout();
-    location.reload();
-});
-
 const known = new Set(store.sources.map((source) => source.title));
 for (const name of await api.samples()) {
     if (!known.has(name)) store.addSample(name, await layerFor(name, await api.sample(name)));

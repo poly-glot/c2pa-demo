@@ -95,12 +95,11 @@ test('boundsOf covers all strokes on whole pixels', () => {
     assert.deepEqual(boundsOf([[{ x: 4.2, y: 7.9 }]]), { height: 1, width: 1, x: 4, y: 7 });
 });
 
-test('AI requests carry a kind the signer accepts and scope their instruction', () => {
+test('AI requests carry a kind the signer accepts and the inpaint region travels apart from the prompt', () => {
     for (const tool of aiTools) assert.ok(AI_ACTIONS.has(tool.request(PARAMS).kind), tool.id);
 
     const inpaint = byId.inpaint.request(PARAMS);
-    assert.match(inpaint.instruction, /^Add a boat\. Change only the region 10,20,30,40 px/);
-    assert.match(inpaint.instruction, /leave everything outside it exactly as it is\.$/);
+    assert.equal(inpaint.instruction, 'Add a boat.');
     assert.deepEqual(inpaint.region, SELECTION);
 
     assert.match(byId.outpaint.request(PARAMS).instruction, /^Extend the image outward by 64 px on every side/);

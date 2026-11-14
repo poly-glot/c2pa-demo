@@ -181,7 +181,7 @@ export const TOOLS = [
         label: 'AI inpaint selection',
         needs: ['prompt', 'selection'],
         request: ({ prompt, selection }) => ({
-            instruction: `${prompt} Change only the region ${selection.x},${selection.y},${selection.width},${selection.height} px of the image; leave everything outside it exactly as it is.`,
+            instruction: prompt,
             kind: ACTION.inpainting,
             region: selection,
         }),

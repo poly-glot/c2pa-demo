@@ -12,7 +12,8 @@ was made from.
 - A Rust toolchain (`cargo`), to build the provenance CLI in `cli/`
 - OpenSSL, only if you want to generate your own test certificate
 - FFmpeg on the `PATH`, only for the video tools and `npm run reference-clip`
-- An API key for the LLM gateway, only for real AI edits (the self-check runs without one)
+- A Hugging Face access token, recommended for real AI edits so they draw on your ZeroGPU quota (the self-check runs
+  without one)
 
 ## Installation
 
@@ -29,19 +30,17 @@ so rebuild after `npm run certs` (`npm test` does this for you).
 
 Fill in `.env`:
 
-| Variable          | Purpose                                                                  | Default                               |
-| ----------------- | ------------------------------------------------------------------------ | ------------------------------------- |
-| `APP_PASSWORD`    | Password every request must carry; unset leaves the demo open            | unset, open                           |
-| `LLM_API_KEY`     | Bearer token for the gateway                                             | none, required for real edits         |
-| `LLM_GATEWAY_URL` | OpenAI-compatible chat completions endpoint                              | none, required for real edits         |
-| `LLM_IMAGE_MODEL` | Image model to request                                                   | `gemini-3.1-flash-image`              |
-| `PORT`            | Port the browser demo listens on                                         | `8787`                                |
-| `PROVENANCE_BIN`  | Path of the provenance CLI binary                                        | `cli/target/release/provenance`       |
-| `C2PA_CERT`       | PEM certificate chain the CLI signs with; overrides the embedded chain   | embedded from `cert/claim-signer.pem` |
-| `C2PA_KEY`        | PEM private key (ES256) for that certificate; overrides the embedded key | embedded from `cert/claim-signer.key` |
-| `C2PA_KEY_PEM`    | The same key as PEM text, for a Secret Manager env var                   | unset                                 |
-| `C2PA_TSA`        | Timestamp authority URL, optional                                        | none                                  |
-| `SELFCHECK`       | Set to `1` to skip the model and copy the image through unchanged        | unset                                 |
+| Variable         | Purpose                                                                  | Default                               |
+| ---------------- | ------------------------------------------------------------------------ | ------------------------------------- |
+| `APP_PASSWORD`   | Password every request must carry; unset leaves the demo open            | unset, open                           |
+| `HF_TOKEN`       | Hugging Face access token sent to the ZeroGPU Spaces                     | unset, anonymous ZeroGPU quota        |
+| `PORT`           | Port the browser demo listens on                                         | `8787`                                |
+| `PROVENANCE_BIN` | Path of the provenance CLI binary                                        | `cli/target/release/provenance`       |
+| `C2PA_CERT`      | PEM certificate chain the CLI signs with; overrides the embedded chain   | embedded from `cert/claim-signer.pem` |
+| `C2PA_KEY`       | PEM private key (ES256) for that certificate; overrides the embedded key | embedded from `cert/claim-signer.key` |
+| `C2PA_KEY_PEM`   | The same key as PEM text, for a Secret Manager env var                   | unset                                 |
+| `C2PA_TSA`       | Timestamp authority URL, optional                                        | none                                  |
+| `SELFCHECK`      | Set to `1` to skip the model and copy the image through unchanged        | unset                                 |
 
 The `C2PA_*` variables are read by the CLI itself; the Node processes only pass their environment through.
 
@@ -96,8 +95,8 @@ npm start -- \
 What happens:
 
 1. The input is read and its MIME type taken from the file extension.
-2. The image and instruction are sent to the gateway as a chat completion with image output. The model is told to keep
-   the aspect ratio and framing.
+2. The image is uploaded to the `black-forest-labs/FLUX.1-Kontext-Dev` Space on Hugging Face ZeroGPU and the instruction
+   is sent with it. The model is told to keep the aspect ratio and framing.
 3. The returned image is wrapped in a new manifest that:
     - names the input as its `parentOf` ingredient, carrying the input's own manifest forward;
     - records a `c2pa.edited` action with digital source type `compositeWithTrainedAlgorithmicMedia`, the model name as
@@ -194,7 +193,7 @@ Four samples are included, and a reference clip for the video tools. The NOVA bo
 
 ### Edit tools
 
-An edit signs its output as a new layer whose manifest carries the parent as a `parentOf` ingredient, subject to the AI scope rule below: AI edits always sign, and other edits sign only when the image is AI-declared. Manual tools name the browser canvas editor as the software agent; AI tools name the gateway model; video tools name ffmpeg.
+An edit signs its output as a new layer whose manifest carries the parent as a `parentOf` ingredient, subject to the AI scope rule below: AI edits always sign, and other edits sign only when the image is AI-declared. Manual tools name the browser canvas editor as the software agent; AI tools name the ZeroGPU Space; video tools name ffmpeg.
 
 The Adjust row holds the four everyday tools (Black & white, Sharpen, Resize with its width inline, Crop selection) and the AI edit bar. Every other tool sits under Advanced filters, a collapsed section that opens downwards.
 
@@ -236,12 +235,12 @@ Notes on the table:
 
 ### AI edits
 
-- **AI edit** sends the open layer and the prompt to the gateway model. The returned image is signed as `c2pa.edited` with `compositeWithTrainedAlgorithmicMedia`. The prompt goes to the model only and is not recorded.
+- **AI edit** sends the open layer and the prompt to FLUX.1 Kontext on ZeroGPU. The returned image is signed as `c2pa.edited` with `compositeWithTrainedAlgorithmicMedia`. The prompt goes to the model only and is not recorded.
 - **AI inpaint selection** sends the whole image with an instruction scoped to the selection: the prompt, then "Change only the region x,y,width,height px of the image; leave everything outside it exactly as it is." The rectangle is recorded in the manifest as `changes`. The prompt and the scoped instruction go to the model only.
 - **AI outpaint** pads the open layer with a white margin in the browser. The padded image is sent to the model as its input. The signed parent ingredient is still the real previous version, so the chain is unbroken and the padding never becomes a parent.
 - **AI upscale 2×** asks the model for twice the width and height and signs the result with `compositeWithTrainedAlgorithmicMedia`. Generative upscaling creates new pixels, so it is AI. The IPTC value `algorithmicallyEnhanced` covers non-generative clean-up and is not treated as AI.
 
-Every gateway request also carries the fixed rules "Keep the image's aspect ratio and framing; change only what is asked."
+Every edit request also carries the fixed rules "Keep the image's aspect ratio and framing; change only what is asked."
 
 ### AI scope
 
@@ -253,7 +252,7 @@ A file is AI-declared when any manifest in its history declares one of three IPT
 
 ### Generate image
 
-The Generate image bar takes a prompt and sends it to the gateway model with no input image. `POST /api/create` signs the result as the first manifest of a new asset: one `c2pa.created` action with digital source type `trainedAlgorithmicMedia`, the model as `softwareAgent`, no parent and no parameters. The prompt is not recorded. The image is added as a source titled `AI-Generated_YYYYMMDD-HHMMSS`.
+The Generate image bar takes a prompt and sends it to the `black-forest-labs/FLUX.1-schnell` Space on ZeroGPU, which returns a 1024×1024 image. `POST /api/create` signs the result as the first manifest of a new asset: one `c2pa.created` action with digital source type `trainedAlgorithmicMedia`, the Space as `softwareAgent`, no parent and no parameters. The prompt is not recorded. The image is added as a source titled `AI-Generated_YYYYMMDD-HHMMSS`.
 
 ### Video
 
@@ -361,11 +360,12 @@ Each action view has the keys `action`, `agent`, `description`, `digitalSourceTy
 - Prompts and template text are never written into a manifest. They go to the model, or into the rendered image, and are then dropped. AI actions carry no `parameters`, and manual actions carry only their fixed description.
 - Manifests carry no thumbnails. Signing turns preview thumbnails off, and the reader neither loads nor ships them.
 - Chrome never resolves `image.decode()` in a hidden tab, so the image loader in `web/dom.mjs` waits for `onload` instead.
-- The gateway model may refuse some inputs, or return no image. The error text appears in the toolbar note, and nothing is added to the library.
+- A ZeroGPU Space may be queued, asleep or out of GPU quota, or return no image. The error text appears in the toolbar note, and nothing is added to the library.
+- FLUX.1 Kontext returns images of about one megapixel, so AI upscale 2× cannot double a large image.
 
 ## Deployment
 
-The demo runs on Cloud Run behind Firebase Hosting in the shared `firebase-cloud-491613` project. Infrastructure lives in the `poly-glot/firebase-cloud` repository (`terraform/apps/c2pa-demo.tf`): the service account, the Workload Identity provider pinned to this repository, the `c2pa-demo` Hosting site, the Cloud Run service and three Secret Manager secrets (`c2pa-demo-app-password`, `c2pa-demo-llm-api-key`, `c2pa-demo-signer-key`) that reach the container as `APP_PASSWORD`, `LLM_API_KEY` and `C2PA_KEY_PEM`.
+The demo runs on Cloud Run behind Firebase Hosting in the shared `firebase-cloud-491613` project. Infrastructure lives in the `poly-glot/firebase-cloud` repository (`terraform/apps/c2pa-demo.tf`): the service account, the Workload Identity provider pinned to this repository, the `c2pa-demo` Hosting site, the Cloud Run service and three Secret Manager secrets (`c2pa-demo-app-password`, `c2pa-demo-hf-token`, `c2pa-demo-signer-key`) that reach the container as `APP_PASSWORD`, `HF_TOKEN` and `C2PA_KEY_PEM`. The Hugging Face token's value comes from the `HF_TOKEN` GitHub secret of `firebase-cloud`, which Terraform writes into `c2pa-demo-hf-token`; the other two are set with `gcloud secrets versions add`.
 
 `firebase.json` rewrites every path on https://c2pa-demo.web.app to the Cloud Run service, so the sign-in page, the app and the API all come from one server. The `Dockerfile` builds a Node 22 image that also installs FFmpeg for the video tools; the test certificate chain ships in the image and the private key arrives from Secret Manager.
 
@@ -423,7 +423,7 @@ main.mjs                      command-line entry point
 server.mjs                    HTTP server for the browser demo: static files and a JSON API
 config/index.mjs              reads .env and supplies defaults
 lib/image-asset.mjs           immutable image value: bytes, MIME type, title
-lib/image-editors.mjs         GatewayImageEditor (calls the model) and IdentityImageEditor (self-check)
+lib/image-editors.mjs         ZeroGpuImageEditor (calls the Spaces) and IdentityImageEditor (self-check)
 lib/video.mjs                 ffmpeg transcode and resize for MP4 files
 lib/http/access.mjs           password gate: session cookie, password header, login and logout
 cli/Cargo.toml                the provenance CLI crate, built on the official c2pa crate

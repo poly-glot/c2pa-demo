@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -29,6 +29,20 @@ const solidPng = (colour, width, height) =>
         mimeType: 'image/png',
         title: `${colour}.png`,
     });
+
+function asRgbaPng(image) {
+    const directory = mkdtempSync(join(tmpdir(), 'rgba-'));
+    try {
+        const path = join(directory, image.title);
+        const output = join(directory, 'rgba.png');
+        writeFileSync(path, image.buffer);
+        execFileSync('ffmpeg', ['-nostdin', '-v', 'error', '-i', path, '-vf', 'format=rgba', '-frames:v', '1', output]);
+
+        return new ImageAsset({ buffer: readFileSync(output), mimeType: 'image/png', title: image.title });
+    } finally {
+        rmSync(directory, { force: true, recursive: true });
+    }
+}
 
 function rgbAt(image, x, y) {
     const directory = mkdtempSync(join(tmpdir(), 'rgb-'));
@@ -71,8 +85,9 @@ test(
 
         assert.deepEqual(rgbAt(edited, 550, 400), rgbAt(blue, 10, 10));
         assert.notDeepEqual(rgbAt(edited, 400, 400), rgbAt(blue, 10, 10));
-        assert.deepEqual(rgbAt(edited, 399, 400), rgbAt(photo, 399, 400));
-        assert.deepEqual(rgbAt(edited, 1200, 900), rgbAt(photo, 1200, 900));
+        const original = asRgbaPng(photo);
+        assert.deepEqual(rgbAt(edited, 399, 400), rgbAt(original, 399, 400));
+        assert.deepEqual(rgbAt(edited, 1200, 900), rgbAt(original, 1200, 900));
     },
 );
 

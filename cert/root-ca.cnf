@@ -5,8 +5,8 @@ x509_extensions = v3
 
 [dn]
 C = NL
-CN = Storyteq C2PA TEST Root CA
-O = Storyteq
+CN = C2PA Demo TEST Root CA
+O = C2PA Demo
 
 [v3]
 basicConstraints = critical, CA:TRUE

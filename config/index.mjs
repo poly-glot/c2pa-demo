@@ -4,7 +4,6 @@ const DEFAULT_BINARY = fileURLToPath(new URL('../cli/target/release/provenance',
 
 export function loadConfig(env = process.env) {
     return Object.freeze({
-        access: { password: env.APP_PASSWORD ?? '' },
         defaultInstruction: 'Change the sparkling water bottle and its label to orange.',
         port: Number(env.PORT) || 8787,
         provenanceBinary: env.PROVENANCE_BIN || DEFAULT_BINARY,

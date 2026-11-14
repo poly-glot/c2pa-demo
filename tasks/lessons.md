@@ -19,3 +19,25 @@
   interface is wrong, not the caller.
 - Rule: tests that exercise the CLI through JavaScript duplicate the Rust integration tests; keep behaviour tests next to
   the binary and leave JavaScript tests for JavaScript behaviour only.
+
+## 2026-11-14: infrastructure changes follow the firebase-cloud pattern, end to end
+
+- Correction: after swapping the gateway for ZeroGPU I left the Terraform edit uncommitted and offered a hand-run list of
+  `terraform apply -target` and `gcloud secrets versions add` steps. The user wanted the repo's own pattern: a PR, the
+  value in GitHub secrets, and a Secret Manager copy, because a GitHub secret cannot be read back.
+- Rule: a new app secret goes GitHub secret → `TF_VAR_*` in `terraform.yml` → sensitive variable → a
+  `google_secret_manager_secret_version` in the app's `.tf`. Read an existing app (openguessr, the shared
+  `gemini_api_key`) before proposing anything.
+- Rule: never destroy a Secret Manager secret as a side effect; `moved` it out of a `for_each` and keep it.
+- Rule: deliver infrastructure as a PR from a worktree on `origin/main`; the local checkout may hold the user's work in
+  progress.
+
+## 2026-11-14: "working" means verified in the running app, with the model's real output
+
+- Correction: a 402/quota failure and a "Failed to parse URL" in production reached the user before I had run the app
+  myself. The AI inpaint built a prompt with pixel coordinates the model cannot follow.
+- Rule: run the app locally and drive every AI path in the browser (create, edit, region edit) before calling it done.
+  Surface the provider's own error text; a bare "null" hides the cause.
+- Rule: a region edit is crop-with-context, edit, paste the selection back with a feathered edge. Never ask a diffusion
+  model to respect coordinates in the prompt.
+- Rule: free ZeroGPU reserves about 90 s per call against 5 minutes a day; budget test runs accordingly.

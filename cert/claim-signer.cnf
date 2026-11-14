@@ -5,8 +5,8 @@ x509_extensions = v3
 
 [dn]
 C = NL
-CN = Storyteq C2PA TEST Claim Signer
-O = Storyteq
+CN = C2PA Demo TEST Claim Signer
+O = C2PA Demo
 
 [v3]
 authorityKeyIdentifier = keyid:always

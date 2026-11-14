@@ -6,9 +6,9 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { loadConfig } from './config/index.mjs';
-import { createAccess } from './lib/http/access.mjs';
 import { ImageAsset, mimeTypeOf } from './lib/image-asset.mjs';
 import { ZeroGpuImageEditor } from './lib/image-editors.mjs';
+import { editRegion } from './lib/region.mjs';
 import { describeVideoEdit, reencode, VIDEO_KINDS } from './lib/video.mjs';
 
 const WEB_DIR = fileURLToPath(new URL('./web/', import.meta.url));
@@ -28,7 +28,6 @@ const isTemplate = (name) => extname(name) === '.html';
 
 const config = loadConfig();
 const editor = new ZeroGpuImageEditor(config.zeroGpu);
-const access = createAccess(config.access);
 const run = promisify(execFile);
 
 const assetOf = (source) => ImageAsset.fromDataUri(source?.image, source?.title);
@@ -82,7 +81,11 @@ const api = {
     'POST /api/edits/ai': async ({ input, instruction, kind, parent, region, title }) => {
         const original = assetOf(parent);
         const source = input ? assetOf({ image: input, title: parent.title }) : original;
-        const edited = (await editor.edit(source, instruction)).retitledAs(title);
+        const edited = (
+            await (region
+                ? editRegion(source, region, (surroundings) => editor.edit(surroundings, instruction))
+                : editor.edit(source, instruction))
+        ).retitledAs(title);
         return sign(edited, [original, edited], (parentPath, editedPath) => [
             'edit',
             parentPath,
@@ -160,8 +163,6 @@ async function readJson(request) {
 
 const NO_CACHE = { 'cache-control': 'private, no-store' };
 
-const isSecure = (request) => request.headers['x-forwarded-proto'] === 'https';
-
 function respondJson(response, status, body) {
     response.writeHead(status, { ...NO_CACHE, 'content-type': 'application/json' });
     response.end(JSON.stringify(body));
@@ -183,34 +184,9 @@ async function serveFile(response, directory, name, status = 200) {
     }
 }
 
-function setCookie(response, cookie) {
-    response.writeHead(204, { ...NO_CACHE, 'set-cookie': cookie });
-    response.end();
-}
-
-async function login(request, response) {
-    const cookie = access.login((await readJson(request)).password, isSecure(request));
-    if (!cookie) return respondJson(response, 401, { error: 'wrong password' });
-
-    setCookie(response, cookie);
-}
-
-const session = {
-    DELETE: (request, response) => setCookie(response, access.logout(isSecure(request))),
-    GET: (request, response) => respondJson(response, 200, { required: !access.open }),
-    POST: login,
-};
-
-const deny = (response, pathname) =>
-    pathname.startsWith('/api/')
-        ? respondJson(response, 401, { error: 'password required' })
-        : serveFile(response, WEB_DIR, 'login.html', 401);
-
 async function route(request, response) {
     const { pathname } = new URL(request.url, 'http://localhost');
     if (pathname === '/api/health') return respondJson(response, 200, { ok: true });
-    if (pathname === '/api/session' && session[request.method]) return session[request.method](request, response);
-    if (!access.authorised(request)) return deny(response, pathname);
 
     const sample = pathname.match(/^\/api\/samples\/(.+)$/);
     if (sample) return serveFile(response, SAMPLES_DIR, decodeURIComponent(sample[1]));

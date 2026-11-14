@@ -97,9 +97,9 @@ jobs:
               run: |
                   for attempt in $(seq 1 12); do
                     HEALTH=$(curl -s -o /dev/null -w '%{http_code}' https://${{ env.FIREBASE_SITE_ID }}.web.app/api/health)
-                    GATE=$(curl -s -o /dev/null -w '%{http_code}' https://${{ env.FIREBASE_SITE_ID }}.web.app/)
-                    echo "attempt $attempt: health $HEALTH, gate $GATE"
-                    if [ "$HEALTH" = "200" ] && [ "$GATE" = "401" ]; then exit 0; fi
+                    APP=$(curl -s -o /dev/null -w '%{http_code}' https://${{ env.FIREBASE_SITE_ID }}.web.app/)
+                    echo "attempt $attempt: health $HEALTH, app $APP"
+                    if [ "$HEALTH" = "200" ] && [ "$APP" = "200" ]; then exit 0; fi
                     sleep 15
                   done
                   exit 1

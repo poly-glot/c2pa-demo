@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { loadConfig } from './config/index.mjs';
 import { ImageAsset, mimeTypeOf } from './lib/image-asset.mjs';
-import { ZeroGpuImageEditor } from './lib/image-editors.mjs';
+import { ModalImageEditor } from './lib/image-editors.mjs';
 import { editRegion } from './lib/region.mjs';
 import { describeVideoEdit, reencode, VIDEO_KINDS } from './lib/video.mjs';
 
@@ -27,7 +27,7 @@ const MAX_OUTPUT = 256 * 1024 * 1024;
 const isTemplate = (name) => extname(name) === '.html';
 
 const config = loadConfig();
-const editor = new ZeroGpuImageEditor(config.zeroGpu);
+const editor = new ModalImageEditor(config.modal);
 const run = promisify(execFile);
 
 const assetOf = (source) => ImageAsset.fromDataUri(source?.image, source?.title);

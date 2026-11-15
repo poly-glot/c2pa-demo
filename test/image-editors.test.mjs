@@ -1,91 +1,52 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { ImageAsset } from '../lib/image-asset.mjs';
-import { ZeroGpuImageEditor } from '../lib/image-editors.mjs';
+import { ModalImageEditor } from '../lib/image-editors.mjs';
 
-const HOST = 'https://space.hf.space';
-const PIXELS = Buffer.from('webp-bytes');
+const PIXELS = Buffer.from('png-bytes');
+const ENDPOINTS = { createUrl: 'https://create.modal.run', editUrl: 'https://edit.modal.run' };
 const realFetch = globalThis.fetch;
 
-const queueStream = (completed) =>
-    [
-        { msg: 'estimation' },
-        { msg: 'process_starts' },
-        { msg: 'process_completed', ...completed },
-        { msg: 'close_stream' },
-    ]
-        .map((message) => `data: ${JSON.stringify(message)}\n\n`)
-        .join('');
-
-function stubSpace(completed) {
+function stubFetch(response) {
     const calls = [];
-    const routes = [
-        ['/host', () => Response.json({ host: HOST })],
-        [
-            '/config',
-            () =>
-                Response.json({
-                    dependencies: [
-                        { api_name: 'other', id: 0 },
-                        { api_name: 'infer', id: 2 },
-                    ],
-                }),
-        ],
-        ['/gradio_api/upload', () => Response.json(['/tmp/gradio/in.png'])],
-        ['/gradio_api/queue/join', () => Response.json({ event_id: 'e1' })],
-        ['/gradio_api/queue/data?session_hash=', () => new Response(queueStream(completed))],
-        ['/gradio_api/file=/tmp/gradio/out.webp', () => new Response(PIXELS)],
-    ];
-
-    globalThis.fetch = async (url, init = {}) => {
-        calls.push({ init, url });
-        const route = routes.find(([fragment]) => url.includes(fragment));
-        return route ? route[1]() : new Response('not found', { status: 404 });
+    globalThis.fetch = async (url, init) => {
+        calls.push({ body: JSON.parse(init.body), headers: init.headers, url });
+        return response();
     };
 
     return calls;
 }
 
-const succeeded = {
-    output: { data: [{ path: '/tmp/gradio/out.webp', url: `${HOST}/gradio_api/file=/tmp/gradio/out.webp` }, 42] },
-    success: true,
-};
-
 afterEach(() => {
     globalThis.fetch = realFetch;
 });
 
-test('edit uploads the image, queues the instruction with the edit rules and returns the WebP result', async () => {
-    const calls = stubSpace(succeeded);
-    const editor = new ZeroGpuImageEditor({ token: 'hf_test' });
-    const source = new ImageAsset({ buffer: Buffer.from('png'), mimeType: 'image/png', title: 'in.png' });
+test('edit posts the image and the instruction with the edit rules and returns the PNG', async () => {
+    const calls = stubFetch(() => new Response(PIXELS));
+    const editor = new ModalImageEditor({ ...ENDPOINTS, key: 'wk-test', secret: 'ws-test' });
+    const source = new ImageAsset({ buffer: Buffer.from('jpeg'), mimeType: 'image/jpeg', title: 'in.jpg' });
 
     const edited = await editor.edit(source, 'Make it orange.');
 
-    assert.equal(edited.mimeType, 'image/webp');
-    assert.equal(edited.title, 'in.png');
+    assert.equal(edited.mimeType, 'image/png');
+    assert.equal(edited.title, 'in.jpg');
     assert.equal(edited.buffer.equals(PIXELS), true);
-    assert.equal(editor.agent, 'black-forest-labs/FLUX.1-Kontext-Dev');
+    assert.equal(editor.agent, 'black-forest-labs/FLUX.1-Kontext-dev');
 
-    const join = JSON.parse(calls.find(({ url }) => url.endsWith('/queue/join')).init.body);
-    const [file, prompt] = join.data;
-    assert.equal(join.fn_index, 2);
-    assert.deepEqual(file, { meta: { _type: 'gradio.FileData' }, path: '/tmp/gradio/in.png' });
-    assert.match(prompt, /^Make it orange\.\nKeep the image's aspect ratio/);
-    assert.equal(
-        calls.every(({ init }) => init.headers.authorization === 'Bearer hf_test'),
-        true,
-    );
+    const [{ body, headers, url }] = calls;
+    assert.equal(url, ENDPOINTS.editUrl);
+    assert.equal(body.image, Buffer.from('jpeg').toString('base64'));
+    assert.match(body.prompt, /^Make it orange\.\nKeep the image's aspect ratio/);
+    assert.equal(headers['modal-key'], 'wk-test');
+    assert.equal(headers['modal-secret'], 'ws-test');
 });
 
-test('generate sends no authorization without a token and surfaces the Space error message', async () => {
-    const calls = stubSpace({ output: { error: 'You have exceeded your free ZeroGPU quota' }, success: false });
-    const editor = new ZeroGpuImageEditor({ token: '' });
+test('generate surfaces the endpoint error text', async () => {
+    const calls = stubFetch(() => new Response('{"detail":"modal-http: invalid credentials"}', { status: 401 }));
+    const editor = new ModalImageEditor({ ...ENDPOINTS, key: '', secret: '' });
 
-    await assert.rejects(editor.generate('a lemon', 'lemon'), /exceeded your free ZeroGPU quota/);
+    await assert.rejects(editor.generate('a lemon', 'lemon'), /answered 401: .*invalid credentials/);
+    assert.equal(calls[0].url, ENDPOINTS.createUrl);
+    assert.deepEqual(calls[0].body, { prompt: 'a lemon' });
     assert.equal(editor.creationAgent, 'black-forest-labs/FLUX.1-schnell');
-    assert.equal(
-        calls.some(({ init }) => 'authorization' in init.headers),
-        false,
-    );
 });

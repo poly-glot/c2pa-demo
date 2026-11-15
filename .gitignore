@@ -10,3 +10,4 @@ assets/
 .zvec-grep/
 .impeccable/
 cli/target/
+__pycache__/

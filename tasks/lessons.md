@@ -41,3 +41,12 @@
 - Rule: a region edit is crop-with-context, edit, paste the selection back with a feathered edge. Never ask a diffusion
   model to respect coordinates in the prompt.
 - Rule: free ZeroGPU reserves about 90 s per call against 5 minutes a day; budget test runs accordingly.
+
+## 2026-11-15: stage files by name; tools leave build output behind
+
+- Correction: `gpu/__pycache__/flux.cpython-314.pyc` reached main in the Modal commit. `modal deploy` imports the app
+  module locally, so Python wrote bytecode next to it, and `git add -A` staged it; `commit -a` then kept updating it.
+- Rule: stage the files the change touches by name and read `git status -s` before every commit. Never `git add -A`
+  after running a tool that may write caches or artefacts.
+- Rule: when a change adds a new language or tool to a repo, add its build and cache output to `.gitignore` in the same
+  commit (`__pycache__/` for Python, `target/` for Rust).

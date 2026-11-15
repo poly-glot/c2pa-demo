@@ -361,16 +361,16 @@ Each action view has the keys `action`, `agent`, `description`, `digitalSourceTy
 
 The demo runs on Cloud Run behind Firebase Hosting in the shared `firebase-cloud-491613` project. Infrastructure lives in the `poly-glot/firebase-cloud` repository (`terraform/apps/c2pa-demo.tf`): the service account, the Workload Identity provider pinned to this repository, the `c2pa-demo` Hosting site, the Cloud Run service and Secret Manager secrets (`c2pa-demo-modal-key`, `c2pa-demo-modal-secret`, `c2pa-demo-signer-key`) that reach the container as `MODAL_KEY`, `MODAL_SECRET` and `C2PA_KEY_PEM`. The Modal values come from the `C2PA_DEMO_MODAL_KEY` and `C2PA_DEMO_MODAL_SECRET` GitHub secrets of `firebase-cloud`, which Terraform writes into Secret Manager; the signer key is set with `gcloud secrets versions add`. The demo has no password.
 
-The GPU side is the `c2pa-demo` app on Modal, deployed by hand with `modal deploy gpu/flux.py`. It reads the FLUX weights with a Hugging Face token from the Modal secret `huggingface` (`HF_TOKEN`), caches them in the `c2pa-demo-weights` volume, and only answers requests that carry the proxy auth token.
+The GPU side is the `c2pa-demo` app on Modal, which CD deploys with `modal deploy gpu/flux.py` using the `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` GitHub secrets. It reads the FLUX weights with a Hugging Face token from the Modal secret `huggingface` (`HF_TOKEN`), caches them in the `c2pa-demo-weights` volume, and only answers requests that carry the proxy auth token.
 
 `firebase.json` rewrites every path on https://c2pa-demo.web.app to the Cloud Run service, so the app and the API come from one server. The `Dockerfile` builds a Node 22 image that also installs FFmpeg for inpainting and the video tools; the test certificate chain ships in the image and the private key arrives from Secret Manager.
 
 GitHub Actions:
 
-| Workflow | Trigger        | What it does                                                                                                                                                                                |
-| -------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CI       | pull requests  | `npm ci`, a throwaway certificate, `npm run check`                                                                                                                                          |
-| CD       | push to `main` | CI, then builds and pushes the image to Artifact Registry, deploys Cloud Run, deploys Hosting, smoke-tests `/api/health` (200) and `/` (200), retrying while the Hosting release propagates |
+| Workflow | Trigger        | What it does                                                                                                                                                                                                           |
+| -------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CI       | pull requests  | `npm ci`, a throwaway certificate, `npm run check`                                                                                                                                                                     |
+| CD       | push to `main` | CI, then deploys the Modal GPU app, builds and pushes the image to Artifact Registry, deploys Cloud Run, deploys Hosting, smoke-tests `/api/health` (200) and `/` (200), retrying while the Hosting release propagates |
 
 The repository secrets `WIF_PROVIDER` and `GCP_SA_EMAIL` come from the Terraform outputs `c2pa_demo_wif_provider` and `c2pa_demo_gcp_sa_email`.
 

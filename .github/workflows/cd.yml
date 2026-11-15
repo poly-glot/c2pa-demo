@@ -21,6 +21,26 @@ jobs:
         name: CI gate
         uses: ./.github/workflows/ci.yml
 
+    modal:
+        name: Deploy Modal GPU app
+        runs-on: ubuntu-latest
+        needs: [ci]
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - run: pip install modal==1.6.4
+
+            - run: modal deploy gpu/flux.py
+              env:
+                  MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+                  MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+
     build:
         name: Build and push image
         runs-on: ubuntu-latest
@@ -61,7 +81,7 @@ jobs:
     deploy:
         name: Deploy Cloud Run and Hosting
         runs-on: ubuntu-latest
-        needs: [build]
+        needs: [build, modal]
         permissions:
             contents: read
             id-token: write

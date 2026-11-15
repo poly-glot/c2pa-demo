@@ -12,8 +12,7 @@ was made from.
 - A Rust toolchain (`cargo`), to build the provenance CLI in `cli/`
 - OpenSSL, only if you want to generate your own test certificate
 - FFmpeg (with `ffprobe`) on the `PATH`, for AI inpaint selection, the video tools and `npm run reference-clip`
-- A Hugging Face access token, recommended for real AI edits so they draw on your ZeroGPU quota (the self-check runs
-  without one)
+- A Modal proxy auth token for real AI edits and image generation (the self-check runs without one)
 
 ## Installation
 
@@ -32,7 +31,8 @@ Fill in `.env`:
 
 | Variable         | Purpose                                                                  | Default                               |
 | ---------------- | ------------------------------------------------------------------------ | ------------------------------------- |
-| `HF_TOKEN`       | Hugging Face access token sent to the ZeroGPU Spaces                     | unset, anonymous ZeroGPU quota        |
+| `MODAL_KEY`      | Modal proxy auth token ID sent to the FLUX endpoints                     | unset, AI calls answer 401            |
+| `MODAL_SECRET`   | Modal proxy auth token secret                                            | unset                                 |
 | `PORT`           | Port the browser demo listens on                                         | `8787`                                |
 | `PROVENANCE_BIN` | Path of the provenance CLI binary                                        | `cli/target/release/provenance`       |
 | `C2PA_CERT`      | PEM certificate chain the CLI signs with; overrides the embedded chain   | embedded from `cert/claim-signer.pem` |
@@ -94,8 +94,7 @@ npm start -- \
 What happens:
 
 1. The input is read and its MIME type taken from the file extension.
-2. The image is uploaded to the `black-forest-labs/FLUX.1-Kontext-Dev` Space on Hugging Face ZeroGPU and the instruction
-   is sent with it. The model is told to keep the aspect ratio and framing.
+2. The image is posted to the FLUX.1 Kontext endpoint on Modal (`gpu/flux.py`) and the instruction is sent with it. The model is told to keep the aspect ratio and framing.
 3. The returned image is wrapped in a new manifest that:
     - names the input as its `parentOf` ingredient, carrying the input's own manifest forward;
     - records a `c2pa.edited` action with digital source type `compositeWithTrainedAlgorithmicMedia`, the model name as
@@ -188,7 +187,7 @@ Four samples are included, and a reference clip for the video tools. The NOVA bo
 
 ### Edit tools
 
-An edit signs its output as a new layer whose manifest carries the parent as a `parentOf` ingredient, subject to the AI scope rule below: AI edits always sign, and other edits sign only when the image is AI-declared. Manual tools name the browser canvas editor as the software agent; AI tools name the ZeroGPU Space; video tools name ffmpeg.
+An edit signs its output as a new layer whose manifest carries the parent as a `parentOf` ingredient, subject to the AI scope rule below: AI edits always sign, and other edits sign only when the image is AI-declared. Manual tools name the browser canvas editor as the software agent; AI tools name the FLUX model; video tools name ffmpeg.
 
 The Adjust row holds the four everyday tools (Black & white, Sharpen, Resize with its width inline, Crop selection) and the AI edit bar. Every other tool sits under Advanced filters, a collapsed section that opens downwards.
 
@@ -230,7 +229,7 @@ Notes on the table:
 
 ### AI edits
 
-- **AI edit** sends the open layer and the prompt to FLUX.1 Kontext on ZeroGPU. The returned image is signed as `c2pa.edited` with `compositeWithTrainedAlgorithmicMedia`. The prompt goes to the model only and is not recorded.
+- **AI edit** sends the open layer and the prompt to FLUX.1 Kontext on Modal. The returned image is signed as `c2pa.edited` with `compositeWithTrainedAlgorithmicMedia`. The prompt goes to the model only and is not recorded.
 - **AI inpaint selection** sends the model the selection plus a margin of half its longer side, so it sees the surroundings, with the prompt alone. The server scales the result back, takes the selection out of it and blends it in with a feathered edge (a sixth of the shorter side, at most 48 px). Pixels outside the selection are the original's, unchanged, and the result is a PNG. The rectangle is recorded in the manifest as `changes`. The prompt goes to the model only.
 - **AI outpaint** pads the open layer with a white margin in the browser. The padded image is sent to the model as its input. The signed parent ingredient is still the real previous version, so the chain is unbroken and the padding never becomes a parent.
 - **AI upscale 2×** asks the model for twice the width and height and signs the result with `compositeWithTrainedAlgorithmicMedia`. Generative upscaling creates new pixels, so it is AI. The IPTC value `algorithmicallyEnhanced` covers non-generative clean-up and is not treated as AI.
@@ -247,7 +246,7 @@ A file is AI-declared when any manifest in its history declares one of three IPT
 
 ### Generate image
 
-The Generate image bar takes a prompt and sends it to the `black-forest-labs/FLUX.1-schnell` Space on ZeroGPU, which returns a 1024×1024 image. `POST /api/create` signs the result as the first manifest of a new asset: one `c2pa.created` action with digital source type `trainedAlgorithmicMedia`, the Space as `softwareAgent`, no parent and no parameters. The prompt is not recorded. The image is added as a source titled `AI-Generated_YYYYMMDD-HHMMSS`.
+The Generate image bar takes a prompt and sends it to `black-forest-labs/FLUX.1-schnell` on Modal, which returns a 1024×1024 image. `POST /api/create` signs the result as the first manifest of a new asset: one `c2pa.created` action with digital source type `trainedAlgorithmicMedia`, the model as `softwareAgent`, no parent and no parameters. The prompt is not recorded. The image is added as a source titled `AI-Generated_YYYYMMDD-HHMMSS`.
 
 ### Video
 
@@ -355,12 +354,14 @@ Each action view has the keys `action`, `agent`, `description`, `digitalSourceTy
 - Prompts and template text are never written into a manifest. They go to the model, or into the rendered image, and are then dropped. AI actions carry no `parameters`, and manual actions carry only their fixed description.
 - Manifests carry no thumbnails. Signing turns preview thumbnails off, and the reader neither loads nor ships them.
 - Chrome never resolves `image.decode()` in a hidden tab, so the image loader in `web/dom.mjs` waits for `onload` instead.
-- A ZeroGPU Space may be queued, asleep or out of GPU quota, or return no image. The error text appears in the toolbar note, and nothing is added to the library.
+- A cold Modal container loads its model for about a minute before the first image; containers stay warm five minutes after the last call. When a call fails, the error text appears in the toolbar note, and nothing is added to the library.
 - FLUX.1 Kontext returns images of about one megapixel, so AI upscale 2× cannot double a large image.
 
 ## Deployment
 
-The demo runs on Cloud Run behind Firebase Hosting in the shared `firebase-cloud-491613` project. Infrastructure lives in the `poly-glot/firebase-cloud` repository (`terraform/apps/c2pa-demo.tf`): the service account, the Workload Identity provider pinned to this repository, the `c2pa-demo` Hosting site, the Cloud Run service and two Secret Manager secrets (`c2pa-demo-hf-token`, `c2pa-demo-signer-key`) that reach the container as `HF_TOKEN` and `C2PA_KEY_PEM`. The Hugging Face token's value comes from the `HF_TOKEN` GitHub secret of `firebase-cloud`, which Terraform writes into `c2pa-demo-hf-token`; the signer key is set with `gcloud secrets versions add`. The demo has no password.
+The demo runs on Cloud Run behind Firebase Hosting in the shared `firebase-cloud-491613` project. Infrastructure lives in the `poly-glot/firebase-cloud` repository (`terraform/apps/c2pa-demo.tf`): the service account, the Workload Identity provider pinned to this repository, the `c2pa-demo` Hosting site, the Cloud Run service and Secret Manager secrets (`c2pa-demo-modal-key`, `c2pa-demo-modal-secret`, `c2pa-demo-signer-key`) that reach the container as `MODAL_KEY`, `MODAL_SECRET` and `C2PA_KEY_PEM`. The Modal values come from the `C2PA_DEMO_MODAL_KEY` and `C2PA_DEMO_MODAL_SECRET` GitHub secrets of `firebase-cloud`, which Terraform writes into Secret Manager; the signer key is set with `gcloud secrets versions add`. The demo has no password.
+
+The GPU side is the `c2pa-demo` app on Modal, deployed by hand with `modal deploy gpu/flux.py`. It reads the FLUX weights with a Hugging Face token from the Modal secret `huggingface` (`HF_TOKEN`), caches them in the `c2pa-demo-weights` volume, and only answers requests that carry the proxy auth token.
 
 `firebase.json` rewrites every path on https://c2pa-demo.web.app to the Cloud Run service, so the app and the API come from one server. The `Dockerfile` builds a Node 22 image that also installs FFmpeg for inpainting and the video tools; the test certificate chain ships in the image and the private key arrives from Secret Manager.
 
@@ -418,7 +419,8 @@ main.mjs                      command-line entry point
 server.mjs                    HTTP server for the browser demo: static files and a JSON API
 config/index.mjs              reads .env and supplies defaults
 lib/image-asset.mjs           immutable image value: bytes, MIME type, title
-lib/image-editors.mjs         ZeroGpuImageEditor (calls the Spaces) and IdentityImageEditor (self-check)
+lib/image-editors.mjs         ModalImageEditor (calls the FLUX endpoints) and IdentityImageEditor (self-check)
+gpu/flux.py                   Modal app: FLUX.1-schnell create and FLUX.1 Kontext edit endpoints on H100
 lib/video.mjs                 ffmpeg transcode and resize for MP4 files
 lib/region.mjs                AI inpaint selection: context crop, feathered paste of the selection only
 cli/Cargo.toml                the provenance CLI crate, built on the official c2pa crate
@@ -473,7 +475,7 @@ test/edit-signing.test.mjs    missing-input hints and version titles
 test/edits.test.mjs           edit registry, canvas operations and AI request scoping
 test/header.test.mjs          status bar chips and file name
 test/image-asset.test.mjs     data URI parsing and titles
-test/image-editors.test.mjs   ZeroGPU queue protocol, token header, Space error messages
+test/image-editors.test.mjs   Modal request body, proxy auth headers, endpoint error text
 test/region.test.mjs          inpaint context crop, feathered paste, untouched outside
 test/template.test.mjs        template parsing, slot form, filling and per-slot components
 test/timeline.test.mjs        timeline descriptions, markers and credential statuses

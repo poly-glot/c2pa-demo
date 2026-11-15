@@ -354,7 +354,7 @@ Each action view has the keys `action`, `agent`, `description`, `digitalSourceTy
 - Prompts and template text are never written into a manifest. They go to the model, or into the rendered image, and are then dropped. AI actions carry no `parameters`, and manual actions carry only their fixed description.
 - Manifests carry no thumbnails. Signing turns preview thumbnails off, and the reader neither loads nor ships them.
 - Chrome never resolves `image.decode()` in a hidden tab, so the image loader in `web/dom.mjs` waits for `onload` instead.
-- A cold Modal container loads its model for about a minute before the first image; containers stay warm five minutes after the last call. When a call fails, the error text appears in the toolbar note, and nothing is added to the library.
+- A cold Modal container loads its model for about a minute before the first image; containers stay warm two minutes after the last call. When a call fails, the error text appears in the toolbar note, and nothing is added to the library.
 - FLUX.1 Kontext returns images of about one megapixel, so AI upscale 2× cannot double a large image.
 
 ## Deployment
